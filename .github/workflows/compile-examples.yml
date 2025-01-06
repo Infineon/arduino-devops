@@ -1,0 +1,86 @@
+name: Compile examples
+
+on:
+  push:
+  pull_request:
+  workflow_call:
+    inputs:
+      setup-script:
+        required: false
+        type: string
+        default: null
+        description: 'Any setup script to run before building the release assets'
+      ci-matrix-file-json:
+        required: true
+        type: string
+        description: 'The file containing the build matrix in JSON format'
+
+jobs:
+
+  set-ci-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+
+    steps:
+
+      - name: Checkout repository 
+        uses: actions/checkout@v4
+
+      - name: Set build matrix
+        id: set-matrix
+        run: |
+          matrix_ci=$(cat ${{ inputs.ci-matrix-file-json }})
+          echo $matrix_ci
+          echo "matrix="$matrix_ci"" >> $GITHUB_OUTPUT
+
+  compile-examples:
+    needs: set-ci-matrix
+    runs-on:
+      - ubuntu-latest
+      # TODO: We will later add support for other platforms
+      # - windows-latest
+      # - macos-latest 
+
+    strategy:
+      matrix: ${{fromJson(needs.set-ci-matrix.outputs.matrix)}}
+
+    steps:
+      - name: Checkout repository 
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-tags: true
+          fetch-depth: 0
+
+      - name: Checkout arduino-devops
+        uses: actions/checkout@v4
+        with:
+          repository: Infineon/arduino-devops
+          ref: build-check-flow
+          path: arduino-devops
+        
+      - name: Install arduino-cli
+        # TODO: We need to find a way to install the arduino-cli for multiple OS
+        # without the need of containers
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s 1.1.0
+          sudo mv bin/arduino-cli /usr/local/bin/arduino-cli
+          arduino-cli version
+
+      - name: Core setup
+        if : ${{ inputs.setup-script }} != null
+        run: |
+          ${{ inputs.setup-script }}
+
+      - name: Pack Arduino core
+        run: |
+          python ./arduino-devops/arduino-packager.py --no-version-check --no-previous-releases
+  
+      - name: Install Arduino core
+        run: |
+          python ./arduino-devops/pckg-install-local.py --pckg-dir build
+
+      - name: Compile Sketch
+        run: |
+          arduino-cli compile --clean --verbose --fqbn ${{ matrix.fqbn }} ${{ matrix.example }}
