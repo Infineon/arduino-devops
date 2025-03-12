@@ -342,7 +342,7 @@ class PckgLocalInstaller:
         pckgr_core_name = self.__get_core_packager_name()
 
         try:
-            local_pckg_index_url = os.path.join(
+            local_pckg_index_url = "{}/{}".format(
                 self.server_url, self.local_pckg_index_name
             )
             logging.info(f'Installing core package from url "{local_pckg_index_url}"')
@@ -408,7 +408,7 @@ class PckgLocalInstallParser:
         """
         # Get the script name without .py extension
         self.installer_tool_name = os.path.splitext(os.path.basename(__file__))[0]
-        self.installer_tool_version = "0.1.0"
+        self.installer_tool_version = "0.1.1"
         self.__create_parser()
 
         args = self.parser.parse_args(
