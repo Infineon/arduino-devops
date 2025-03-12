@@ -36,11 +36,7 @@ jobs:
 
   compile-examples:
     needs: set-ci-matrix
-    runs-on:
-      - ubuntu-latest
-      # TODO: We will later add support for other platforms
-      # - windows-latest
-      # - macos-latest 
+    runs-on: ${{ matrix.os }}
 
     strategy:
       matrix: ${{fromJson(needs.set-ci-matrix.outputs.matrix)}}
@@ -59,14 +55,21 @@ jobs:
           repository: Infineon/arduino-devops
           ref: latest
           path: arduino-devops
-        
-      - name: Install arduino-cli
-        # TODO: We need to find a way to install the arduino-cli for multiple OS
-        # without the need of containers
+
+      - name: Install Python dependencies
         run: |
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s 1.1.0
-          sudo mv bin/arduino-cli /usr/local/bin/arduino-cli
-          arduino-cli version
+            python -m pip install --upgrade pip
+            pip install -r arduino-devops/requirements.txt
+        
+      - name: Install arduino-cli Linux
+        if: runner.os == 'Linux'
+        run: |
+          ./arduino-devops/arduino-cli-install.sh 1.1.0
+
+      - name: Install arduino-cli Windows
+        if: runner.os == 'Windows'
+        run: |
+          .\arduino-devops\arduino-cli-install.ps1 1.1.0 
 
       - name: Core setup
         if : ${{ inputs.setup-script }} != null
