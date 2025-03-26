@@ -1,5 +1,18 @@
 name: Build examples
 
+### QUICK REFERENCE ###
+
+# Requires Arduino library structure in the calling repository.
+# See: https://docs.arduino.cc/arduino-cli/library-specification/
+
+# How to call this workflow from another workflow:
+# name: Build examples
+# on:
+#  ...
+# jobs:
+#   build-examples:
+#     uses: Infineon/arduino-devops/.github/workflows/lib-compile-examples.yml@main
+
 on:
   workflow_call:
 
@@ -15,7 +28,7 @@ jobs:
         uses: arduino/compile-sketches@v1
         with:
           fqbn: arduino:avr:uno
-          
+
   build-matrix:
     needs: build-arduino-uno
     name: ${{ matrix.board.fqbn }}
