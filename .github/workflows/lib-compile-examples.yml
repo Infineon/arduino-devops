@@ -1,0 +1,54 @@
+name: Build examples
+
+on:
+  workflow_call:
+
+jobs:
+  build-examples:
+    name: ${{ matrix.board.fqbn }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        board:
+          - fqbn: arduino:avr:uno
+          - fqbn: arduino:avr:nano
+          - fqbn: arduino:avr:mega
+          - fqbn: arduino:renesas_uno:minima
+          - fqbn: arduino:renesas_uno:unor4wifi
+          - fqbn: arduino:samd:mkrzero
+          - fqbn: "Infineon:xmc:XMC1100_XMC2GO"
+          - fqbn: "Infineon:xmc:XMC1300_Boot_Kit"
+          - fqbn: "Infineon:xmc:XMC1400_XMC2GO"
+          - fqbn: "Infineon:xmc:XMC1400_Arduino_Kit"
+          - fqbn: "Infineon:xmc:XMC4700_Relax_Kit"
+          - fqbn: "Infineon:xmc:XMC1100_Boot_Kit"
+          - fqbn: "infineon:psoc6:cy8ckit_062s2_ai"
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+    
+      - name: Compile Arduino examples
+        if: contains(matrix.board.fqbn, 'arduino:')
+        uses: arduino/compile-sketches@v1
+        with:
+          fqbn: ${{ matrix.board.fqbn }}
+      
+      - name: Compile Infineon XMC examples
+        if: contains(matrix.board.fqbn, 'Infineon:xmc')
+        uses: arduino/compile-sketches@v1
+        with:
+          fqbn: ${{ matrix.board.fqbn }}
+          platforms: |
+              - name: Infineon:xmc
+                source-url: https://github.com/Infineon/XMC-for-Arduino/releases/latest/download/package_infineon_index.json
+      
+      - name: Compile Infineon PSOC6 examples
+        if: contains(matrix.board.fqbn, 'infineon:psoc6')
+        uses: arduino/compile-sketches@v1
+        with:
+          fqbn: ${{ matrix.board.fqbn }}
+          platforms: |
+              - name: infineon:psoc6
+                source-url: https://github.com/Infineon/arduino-core-psoc6/releases/latest/download/package_psoc6_index.json
