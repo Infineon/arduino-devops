@@ -1,0 +1,68 @@
+name: Package core
+
+on:
+  push:
+  pull_request:
+  workflow_call:
+    inputs:
+      setup-script:
+        required: false
+        type: string
+        default: null
+        description: 'Any setup script to run before building the Arduino package and compiling the examples'
+      release:
+        required: false
+        type: boolean
+        default: true
+        description: 'When false, the packager will not check version consistency and not include the release history'
+
+jobs:
+
+  package-core:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository 
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-tags: true
+          fetch-depth: 0
+
+      - name: Checkout arduino-devops
+        uses: actions/checkout@v4
+        with:
+          repository: Infineon/arduino-devops
+          ref: split-package-core
+          path: arduino-devops
+
+      - name: Install python dependencies
+        run: |
+            python -m pip install --upgrade pip
+            pip install -r arduino-devops/requirements.txt
+
+      - name: Core setup
+        if : ${{ inputs.setup-script }} != null
+        run: |
+          ${{ inputs.setup-script }}
+
+      - name: Set packager options
+        run: |
+          if [ "${{ inputs.release }}" = "false" ]; then
+            echo "packager_opts=--no-version-check --no-previous-releases" >> $GITHUB_ENV
+          else
+            echo "packager_opts=" >> $GITHUB_ENV
+          fi
+
+      - name: Pack arduino core
+        run: |
+          python ./arduino-devops/arduino-packager.py $packager_opts
+  
+      - name: Upload core assets
+
+        uses: actions/upload-artifact@v4
+        with: 
+          name: arduino-core-package
+          path: |
+            build/*.zip
+            build/*.json
