@@ -56,28 +56,27 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Infineon/arduino-devops
-          ref: latest
+          ref: split-package-core
           path: arduino-devops
+
+      # - name: Install arduino-cli Linux
+      #   if: runner.os == 'Linux'
+      #   run: |
+      #     ./arduino-devops/arduino-cli-install.sh 1.1.0
+
+      # - name: Install arduino-cli Windows
+      #   if: runner.os == 'Windows'
+      #   run: |
+      #     .\arduino-devops\arduino-cli-install.ps1 1.1.0 
+
+      - name: Install arduino-cli
+        run: |
+          python ./arduino-devops/arduino-cli-install.py 1.1.0
 
       - name: Retrieve core package
         uses: actions/download-artifact@v4
-
-      # - name: Install python dependencies
-      #   run: |
-      #     python -m pip install --upgrade pip
-      #     pip install -r arduino-devops/requirements.txt
-        
-      - name: Install arduino-cli Linux
-        if: runner.os == 'Linux'
-        run: |
-          ./arduino-devops/arduino-cli-install.sh 1.1.0
-
-      - name: Install arduino-cli Windows
-        if: runner.os == 'Windows'
-        run: |
-          .\arduino-devops\arduino-cli-install.ps1 1.1.0 
   
-      - name: Install Arduino core
+      - name: Install arduino core
         run: |
           # Install python dependencies
           python -m pip install --upgrade pip
@@ -85,6 +84,6 @@ jobs:
           # The package is donwloaded in the directory arduino-core-package
           python ./arduino-devops/pckg-install-local.py --pckg-dir arduino-core-package
 
-      - name: Compile Sketch
+      - name: Compile sketch
         run: |
           arduino-cli compile --clean --verbose --fqbn ${{ matrix.fqbn }} ${{ matrix.example }}
