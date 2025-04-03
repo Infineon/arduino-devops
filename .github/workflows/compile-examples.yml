@@ -34,7 +34,7 @@ jobs:
           echo "matrix="$matrix_ci"" >> $GITHUB_OUTPUT
 
   package-core:
-    uses: Infineon/arduino-devops/.github/workflows/package-core.yml@split-package-core
+    uses: Infineon/arduino-devops/.github/workflows/package-core.yml@latest
     with:
       setup-script: bash ./tools/dev-setup.sh
       release: false
