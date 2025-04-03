@@ -71,7 +71,7 @@ jobs:
 
       - name: Install arduino-cli
         run: |
-          python ./arduino-devops/arduino-cli-install.py 1.1.0
+          python ./arduino-devops/arduino-cli-install.py 1.2.0
 
       - name: Retrieve core package
         uses: actions/download-artifact@v4
