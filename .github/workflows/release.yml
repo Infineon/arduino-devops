@@ -19,44 +19,35 @@ on:
         description: 'Any setup script to run before building the release assets'
 
 jobs:
+
+  core-package:
+    if: startsWith(github.ref, 'refs/tags/')
+    uses: Infineon/arduino-devops/.github/workflows/package-core.yml@latest
+    with:
+      setup-script: ${{ inputs.setup-script }}
+      release: true
+    secrets: inherit
+
   release:
+    needs: core-package
     runs-on: ubuntu-latest
 
     if: startsWith(github.ref, 'refs/tags/')
     steps:
-    - name: Checkout actions
-      uses: actions/checkout@v4
-      with:
-        fetch-tags: true
-        fetch-depth: 0
+    - name: Retrieve core package
+      uses: actions/download-artifact@v4
 
-    - name: Checkout arduino-devops
-      uses: actions/checkout@v4
-      with:
-        repository: Infineon/arduino-devops
-        ref: latest
-        path: arduino-devops
-    
     - name: Build release changelog
       id: build_changelog
       uses: mikepenz/release-changelog-builder-action@v3
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Core setup
-      if : ${{ inputs.setup-script }} != null
-      run: |
-        ${{ inputs.setup-script }}
-
-    - name: Build release assets
-      run: |
-        python arduino-devops/arduino-packager.py
-
     - name: Upload assets
       uses: softprops/action-gh-release@v1
       with:
         name: ${{ inputs.release-title }} ${{  github.ref_name  }}
         files: |
-          build/*.zip
-          build/*.json
+          arduino-core-package/*.zip
+          arduino-core-package/*.json
         body: ${{steps.build_changelog.outputs.changelog}}
