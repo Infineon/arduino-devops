@@ -59,6 +59,17 @@ jobs:
           ref: latest
           path: arduino-devops
 
+      - name: Check if arduino-examples exists as a submodule
+        id: check_submodule
+        run: |
+          SUBMODULE_PATH=$(git config --file=.gitmodules --get-regexp 'submodule\..*\.url' | grep "arduino/arduino-examples" | sed -E 's/submodule\.(.*)\.url.*/\1/')
+          if [ -n "$SUBMODULE_PATH" ]; then
+              SUBMODULE_DIRECTORY=$(git config --file=.gitmodules --get "submodule.${SUBMODULE_PATH}.path")
+              git submodule update --init -- "$SUBMODULE_DIRECTORY"
+              echo "Submodule ${SUBMODULE_PATH} initialized and updated."
+          fi
+        shell: bash
+
       - name: Install arduino-cli
         run: |
           python ./arduino-devops/arduino-cli-install.py 1.2.0
