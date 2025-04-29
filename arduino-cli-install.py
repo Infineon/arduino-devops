@@ -10,8 +10,14 @@ def install_arduino_cli(version):
         # Linux or macOS installation
         try:
             print(f"Installing arduino-cli version {version} on {system}...")
+            # Choose package os name
+            if system == "Linux":
+                os_name = "Linux"
+            elif system == "Darwin":
+                os_name = "macOS"
+
             subprocess.run([
-                "curl", "-fsSL", f"https://downloads.arduino.cc/arduino-cli/arduino-cli_{version}_Linux_64bit.tar.gz",
+                "curl", "-fsSL", f"https://downloads.arduino.cc/arduino-cli/arduino-cli_{version}_{os_name}_64bit.tar.gz",
                 "-o", "arduino-cli.tar.gz"
             ], check=True)
             subprocess.run(["tar", "-xzf", "arduino-cli.tar.gz"], check=True)
