@@ -9,7 +9,7 @@ on:
         required: false
         type: string
         default: null
-        description: 'Any setup script to run before building the Arduino package and compiling the examples'
+        description: 'Any setup script to run before building the Arduino package'
       release:
         required: false
         type: boolean
