@@ -1,0 +1,128 @@
+
+# This is test requires the arduino-devops directory
+# to be in the root folder of the XMC-for-Arduino repository
+# The ci-matrix-config.yml used is version (commit) a9ddae541a4c7d20d61acc066ca068c15f76401a
+
+
+# 1. List of sketches for XMC1100_Boot_Kit
+
+$ python ../arduino-ci.py config --list sketch --filter fqbn=Infineon:xmc:XMC1100_Boot_Kit -r ./../.. --yaml
+sketch:
+- libraries/DeviceControlXMC/examples/DieTemperatureMeasurement/DieTemperatureMeasurement.ino
+- libraries/DeviceControlXMC/examples/HeapMemoryMeasurement/HeapMemoryMeasurement.ino
+- libraries/DeviceControlXMC/examples/SleepModeXMC1100/SleepModeXMC1100.ino
+- libraries/DeviceControlXMC/examples/StackMemoryMeasurement/StackMemoryMeasurement.ino
+- libraries/I2S
+- libraries/LED
+- libraries/RTC/examples/SimpleRTC
+- libraries/SPI
+- libraries/Wire
+
+>=
+
+# 2. List of sketches for XMC1100_XMC2GO
+
+$ python ../arduino-ci.py config --list sketch --filter fqbn=Infineon:xmc:XMC1100_XMC2GO -r ./../.. --yaml
+sketch:
+- libraries/DeviceControlXMC/examples/DieTemperatureMeasurement/DieTemperatureMeasurement.ino
+- libraries/DeviceControlXMC/examples/HeapMemoryMeasurement/HeapMemoryMeasurement.ino
+- libraries/DeviceControlXMC/examples/SleepModeXMC1100/SleepModeXMC1100.ino
+- libraries/DeviceControlXMC/examples/StackMemoryMeasurement/StackMemoryMeasurement.ino
+- libraries/I2S
+- libraries/LED
+- libraries/RTC/examples/SimpleRTC
+- libraries/SPI
+- libraries/Wire
+
+>=
+
+# 3. List of sketches for XMC1300_Boot_Kit
+
+$ python ../arduino-ci.py config --list sketch --filter fqbn=Infineon:xmc:XMC1300_Boot_Kit -r ./../.. --yaml
+sketch:
+- libraries/DeviceControlXMC/examples/DieTemperatureMeasurement/DieTemperatureMeasurement.ino
+- libraries/DeviceControlXMC/examples/HeapMemoryMeasurement/HeapMemoryMeasurement.ino
+- libraries/DeviceControlXMC/examples/SleepModeXMC1100/SleepModeXMC1100.ino
+- libraries/DeviceControlXMC/examples/StackMemoryMeasurement/StackMemoryMeasurement.ino
+- libraries/LED
+- libraries/RTC/examples/SimpleRTC
+- libraries/SPI
+- libraries/Wire
+
+>=
+
+# 4. List of sketches for XMC1400_Arduino_Kit
+
+$ python ../arduino-ci.py config --list sketch --filter fqbn=Infineon:xmc:XMC1400_Arduino_Kit -r ./../.. --yaml
+sketch:
+- libraries/DeviceControlXMC/examples/DieTemperatureMeasurement/DieTemperatureMeasurement.ino
+- libraries/DeviceControlXMC/examples/HeapMemoryMeasurement/HeapMemoryMeasurement.ino
+- libraries/DeviceControlXMC/examples/SleepModeXMC1100/SleepModeXMC1100.ino
+- libraries/LED
+- libraries/RTC/examples/SimpleRTC
+- libraries/SPI
+- libraries/Wire
+
+>=
+
+# 5. List of sketches for XMC1400_XMC2GO
+
+$ python ../arduino-ci.py config --list sketch --filter fqbn=Infineon:xmc:XMC1400_XMC2GO -r ./../.. --yaml
+sketch:
+- libraries/CAN
+- libraries/DeviceControlXMC/examples/DieTemperatureMeasurement/DieTemperatureMeasurement.ino
+- libraries/DeviceControlXMC/examples/HeapMemoryMeasurement/HeapMemoryMeasurement.ino
+- libraries/DeviceControlXMC/examples/SleepModeXMC1100/SleepModeXMC1100.ino
+- libraries/I2S
+- libraries/LED
+- libraries/RTC/examples/SimpleRTC
+- libraries/SPI
+- libraries/Wire
+
+>=
+
+# 6. List of sketches for XMC4200_Platform2GO
+
+$ python ../arduino-ci.py config --list sketch --filter fqbn=Infineon:xmc:XMC4200_Platform2GO -r ./../.. --yaml
+sketch:
+- libraries/CAN
+- libraries/DeviceControlXMC/examples/StackMemoryMeasurement/StackMemoryMeasurement.ino
+- libraries/LED
+- libraries/RTC/examples/AlarmRTC/AlarmRTC.ino
+- libraries/RTC/examples/SimpleRTC
+- libraries/SPI
+- libraries/Wire
+
+>=
+
+# 7. List of sketches for XMC4400_Platform2GO
+
+$ python ../arduino-ci.py config --list sketch --filter fqbn=Infineon:xmc:XMC4400_Platform2GO -r ./../.. --yaml
+sketch:
+- libraries/CAN
+- libraries/DeviceControlXMC/examples/StackMemoryMeasurement/StackMemoryMeasurement.ino
+- libraries/LED
+- libraries/RTC/examples/SimpleRTC
+- libraries/SPI
+- libraries/Wire
+
+>=
+
+# 8. List of sketches for XMC4700_Relax_Kit
+
+$ python ../arduino-ci.py config --list sketch --filter fqbn=Infineon:xmc:XMC4700_Relax_Kit -r ./../.. --yaml
+sketch:
+- libraries/CAN
+- libraries/DeviceControlXMC/examples/DieTemperatureMeasurement/DieTemperatureMeasurement.ino
+- libraries/DeviceControlXMC/examples/HeapMemoryMeasurement/HeapMemoryMeasurement.ino
+- libraries/DeviceControlXMC/examples/SleepModeXMC4700/SleepModeXMC4700.ino
+- libraries/DeviceControlXMC/examples/StackMemoryMeasurement/StackMemoryMeasurement.ino
+- libraries/DMA
+- libraries/I2S
+- libraries/LED
+- libraries/RTC/examples/AlarmRTC/AlarmRTC.ino
+- libraries/RTC/examples/SimpleRTC
+- libraries/SPI
+- libraries/Wire
+
+>=
