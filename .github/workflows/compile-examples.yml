@@ -5,19 +5,30 @@ on:
   pull_request:
   workflow_call:
     inputs:
-      setup-script:
+      core-setup-script:
         required: false
         type: string
         default: null
-        description: 'Any setup script to run before building the Arduino package and compiling the examples'
-      ci-matrix-file-json:
-        required: true
+        description: 'Any setup script to run before building the Arduino package'
+      ci-setup-script:
+        required: false
         type: string
-        description: 'The file containing the build matrix in JSON format'
+        default: null
+        description: 'Any setup script to run before compiling the examples'
+      os-list:
+        required: false
+        type: string
+        default: 'ubuntu-latest, windows-latest, macos-latest'
+        description: 'The list of operating systems to run the job on. The list should be a comma-separated string, e.g. "ubuntu-latest,windows-latest,macos-latest"'
 
 jobs:
+  package-core: 
+    uses: Infineon/arduino-devops/.github/workflows/package-core.yml@latest
+    with:
+      setup-script: ${{ inputs.core-setup-script }}
+      release: false
 
-  set-ci-matrix:
+  ci-setup:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -26,62 +37,52 @@ jobs:
       - name: Checkout repository 
         uses: actions/checkout@v4
 
-      - name: Set build matrix
-        id: set-matrix
-        run: |
-          matrix_ci=$(cat ${{ inputs.ci-matrix-file-json }})
-          echo $matrix_ci
-          echo "matrix="$matrix_ci"" >> $GITHUB_OUTPUT
-
-  package-core:
-    uses: Infineon/arduino-devops/.github/workflows/package-core.yml@latest
-    with:
-      setup-script: bash ./tools/dev-setup.sh
-      release: false
-
-  compile-examples:
-    needs: 
-      - set-ci-matrix
-      - package-core 
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix: ${{fromJson(needs.set-ci-matrix.outputs.matrix)}}
-
-    steps:
-      - name: Checkout repository 
-        uses: actions/checkout@v4
-
-      - name: Checkout arduino-devops
+      - name: Checkout arduino-devops 
         uses: actions/checkout@v4
         with:
           repository: Infineon/arduino-devops
           ref: latest
           path: arduino-devops
 
-      - name: Check if arduino-examples exists as a submodule
-        id: check_submodule
+      - name: Set build matrix
+        id: set-matrix
         run: |
-          SUBMODULE_PATH=$(git config --file=.gitmodules --get-regexp 'submodule\..*\.url' | grep "arduino/arduino-examples" | sed -E 's/submodule\.(.*)\.url.*/\1/')
-          if [ -n "$SUBMODULE_PATH" ]; then
-              SUBMODULE_DIRECTORY=$(git config --file=.gitmodules --get "submodule.${SUBMODULE_PATH}.path")
-              git submodule update --init -- "$SUBMODULE_DIRECTORY"
-              echo "Submodule ${SUBMODULE_PATH} initialized and updated."
-          fi
-        shell: bash
+          matrix_ci=$(python ./arduino-devops/arduino-ci.py config --list fqbn)
+          echo $matrix_ci
+          echo "matrix="$matrix_ci"" >> $GITHUB_OUTPUT
 
-      - name: Install arduino-cli
-        run: |
-          python ./arduino-devops/arduino-cli-install.py 1.2.0
+  compile-examples-ubuntu:
+    name: ubuntu
+    if: contains(inputs.os-list, 'ubuntu')
+    needs: 
+      - ci-setup
+      - package-core
+    uses : Infineon/arduino-devops/.github/workflows/compile-examples-os.yml@latest
+    with:
+      ci-matrix-json: ${{ needs.ci-setup.outputs.matrix }}
+      setup-script: ${{ inputs.ci-setup-script }}
+      os: ubuntu-latest
 
-      - name: Retrieve core package
-        uses: actions/download-artifact@v4
-  
-      - name: Install arduino core
-        run: |
-          # The package is donwloaded in the directory arduino-core-package
-          python ./arduino-devops/pckg-install-local.py --pckg-dir arduino-core-package
+  compile-examples-windows:
+    name: windows
+    if: contains(inputs.os-list, 'windows')
+    needs: 
+      - ci-setup
+      - package-core
+    uses : Infineon/arduino-devops/.github/workflows/compile-examples-os.yml@latest
+    with:
+      ci-matrix-json: ${{ needs.ci-setup.outputs.matrix }}
+      setup-script: ${{ inputs.ci-setup-script }}
+      os: windows-latest
 
-      - name: Compile sketch
-        run: |
-          arduino-cli compile --clean --verbose --fqbn ${{ matrix.fqbn }} ${{ matrix.example }}
+  compile-examples-macos:
+    name: macos
+    if: contains(inputs.os-list, 'macos')
+    needs: 
+      - ci-setup
+      - package-core
+    uses : Infineon/arduino-devops/.github/workflows/compile-examples-os.yml@latest
+    with:
+      ci-matrix-json: ${{ needs.ci-setup.outputs.matrix }}
+      setup-script: ${{ inputs.ci-setup-script }}
+      os: macos-latest
