@@ -1,0 +1,231 @@
+#####################################################################
+# These tests are validating the different options
+# of the "config" subparser command of the arduino-ci.py 
+# utility. 
+# These tests are a not intended for coverage, but the argparser
+# CLI main features.
+
+# These test are based on the provided values of the dummy 
+# "ci-matrix-config.yml" file located in the same directory.
+# Therefore, no autodiscovery of the matrix default values 
+# is evaluated in these tests.
+#####################################################################
+
+# 1. config_no_flags
+# The "config" command returns the configuration 
+# the CI matrix as unformatted JSON.
+
+$ python ../arduino-ci.py config
+{'fqbn': ['fqbn_a', 'fqbn_b', 'fqbn_c', 'fqbn_c_variant', 'fqbn_to_exclude_generally'], 'sketch': ['sketch_a/sketch_a.ino', 'sketch_b/sketch_b.ino', 'sketch_c/sketch_c.ino', 'library_path_a/', 'some_path/test_sketch/test_sketch.ino'], 'include': [{'fqbn': 'additional_board', 'sketch': ['very_specific_example/very_specific_example.ino', 'second_specific_test/second_specific_test.ino']}, {'fqbn': 'fqbn_zzz', 'sketch': 'sketch_a/sketch_a.ino'}, {'fqbn': 'boardy_board', 'sketch': 'some_path_of_a_library/'}, {'sketch': 'a_sketch_to_include_generally.ino'}], 'exclude': [{'fqbn': 'fqbn_c', 'sketch': 'sketch_b/sketch_b.ino'}, {'fqbn': 'fqbn_to_exclude_generally'}], 'asset_type': 'core'}
+
+# 2. config_json_pretty
+# The "--json-pretty" flag returns the configuration 
+# the CI matrix as formatted JSON.
+
+$ python ../arduino-ci.py config --json-pretty
+{
+    "fqbn": [
+        "fqbn_a",
+        "fqbn_b",
+        "fqbn_c",
+        "fqbn_c_variant",
+        "fqbn_to_exclude_generally"
+    ],
+    "sketch": [
+        "sketch_a/sketch_a.ino",
+        "sketch_b/sketch_b.ino",
+        "sketch_c/sketch_c.ino",
+        "library_path_a/",
+        "some_path/test_sketch/test_sketch.ino"
+    ],
+    "include": [
+        {
+            "fqbn": "additional_board",
+            "sketch": [
+                "very_specific_example/very_specific_example.ino",
+                "second_specific_test/second_specific_test.ino"
+            ]
+        },
+        {
+            "fqbn": "fqbn_zzz",
+            "sketch": "sketch_a/sketch_a.ino"
+        },
+        {
+            "fqbn": "boardy_board",
+            "sketch": "some_path_of_a_library/"
+        },
+        {
+            "sketch": "a_sketch_to_include_generally.ino"
+        }
+    ],
+    "exclude": [
+        {
+            "fqbn": "fqbn_c",
+            "sketch": "sketch_b/sketch_b.ino"
+        },
+        {
+            "fqbn": "fqbn_to_exclude_generally"
+        }
+    ],
+    "asset_type": "core"
+}
+
+# 3. config_yaml
+# The "--yaml" flag returns the configuration 
+# the CI matrix in YAML format.
+
+$ python ../arduino-ci.py config --yaml
+asset_type: core
+exclude:
+-   fqbn: fqbn_c
+    sketch: sketch_b/sketch_b.ino
+-   fqbn: fqbn_to_exclude_generally
+fqbn:
+- fqbn_a
+- fqbn_b
+- fqbn_c
+- fqbn_c_variant
+- fqbn_to_exclude_generally
+include:
+-   fqbn: additional_board
+    sketch:
+    - very_specific_example/very_specific_example.ino
+    - second_specific_test/second_specific_test.ino
+-   fqbn: fqbn_zzz
+    sketch: sketch_a/sketch_a.ino
+-   fqbn: boardy_board
+    sketch: some_path_of_a_library/
+-   sketch: a_sketch_to_include_generally.ino
+sketch:
+- sketch_a/sketch_a.ino
+- sketch_b/sketch_b.ino
+- sketch_c/sketch_c.ino
+- library_path_a/
+- some_path/test_sketch/test_sketch.ino
+
+>= #shelltest-delimiter
+
+# 4. config_list_fqnb 
+# The "--list" <key> returns all the values contained
+# in that key in the ci matrix configuration. The allowed
+# keys are "fqbn" o "sketch". 
+# In this case, the fqbn list is requested, and it provides the 
+# default list of "fqbn" plus any additional if included 
+# in the "include" key. 
+# A "fqbn" include in the default "fbqn" is excluded from the
+# "exclude" list as well. 
+# Additionally, it is returned in pretty JSON format.
+
+$ python ../arduino-ci.py config --list fqbn --json-pretty
+{
+    "fqbn": [
+        "additional_board",
+        "boardy_board",
+        "fqbn_a",
+        "fqbn_b",
+        "fqbn_c",
+        "fqbn_c_variant",
+        "fqbn_zzz"
+    ]
+}
+
+# 5. config_list_sketch 
+# The "--list" <key> returns all the values contained
+# in that key in the ci matrix configuration. The allowed
+# keys are "fqbn" o "sketch". 
+# In this case, the sketch list is requested, and it provides the 
+# default list of "sketch" plus any additional if included 
+# in the "include" key.  
+# Additionally, it is returned in yaml format.
+
+$ python ../arduino-ci.py config --list sketch --yaml
+sketch:
+- a_sketch_to_include_generally.ino
+- library_path_a/
+- second_specific_test/second_specific_test.ino
+- sketch_a/sketch_a.ino
+- sketch_b/sketch_b.ino
+- sketch_c/sketch_c.ino
+- some_path/test_sketch/test_sketch.ino
+- some_path_of_a_library/
+- very_specific_example/very_specific_example.ino
+
+>=
+
+# 6. config_list_invalid_key
+# Try to list a key that is not allowed.
+
+$ python ../arduino-ci.py config --list invalid_key
+{'invalid_key': []}
+>2
+ERROR: Key "invalid_key" is not allowed. Allowed keys are: "['fqbn', 'sketch']"
+
+# 7. config_list_filter_invalid_filter_format
+# The filter does not follow the convention "key=value"
+
+$ python ../arduino-ci.py config --list fqbn --filter invalid_filter
+{'fqbn': []}
+>2
+ERROR: Filter "invalid_filter" is not in the format key=value
+
+# 8. config_list_filter_invalid_key
+# The key of the filter is not an allowed or valid key
+
+$ python ../arduino-ci.py config --list fqbn --filter invalid_key=yes
+{'fqbn': []}
+>2
+ERROR: Key "invalid_key" is not allowed. Allowed keys are: "['fqbn', 'sketch']"
+
+# 9. config_list_sketch_filter_sketch_no_match 
+# In this test the "--filter" flag is used to check if a value
+# is present in the CI configuration matrix. 
+# When it is not, it returns an empty list.
+# The "--filter" flag is is used together with "--list".
+# For a non-existing "sketch":
+
+$ python ../arduino-ci.py config --list sketch --filter sketch=non-existing
+{'sketch': []}
+
+
+# 10. config_list_sketch_filter_sketch_match 
+# In this test the "--filter" flag is used to check if a value
+# is present in the CI configuration matrix. 
+# When it is not, it returns an empty list.
+# The "--filter" flag is is used together with "--list".
+# For a the existing "sketch":
+
+$ python ../arduino-ci.py config --list sketch --filter sketch=very_specific_example/very_specific_example.ino
+{'sketch': ['very_specific_example/very_specific_example.ino']}
+
+# 11. config_list_fqbn_filter_fqbn_match
+# In this test the "--filter" flag to return the list of 
+# values of key which match the value of another key in the
+# configuration.
+# When it is not, it returns an empty list.
+# The "--filter" flag is is used together with "--list".
+# Check a for "fqbn" in the main matrix:
+
+$ python ../arduino-ci.py config --list fqbn --filter fqbn=fqbn_c
+{'fqbn': ['fqbn_c']}
+
+# 12. config_list_sketch_filter_fqbn_no_existing_fqbn
+
+$ python ../arduino-ci.py config --list sketch --filter fqbn=non-existing
+{'sketch': []}
+
+# 13. config_list_sketch_filter_fqbn_only_main
+$ python ../arduino-ci.py config --list sketch --filter fqbn=fqbn_b
+{'sketch': ['a_sketch_to_include_generally.ino', 'library_path_a/', 'sketch_a/sketch_a.ino', 'sketch_b/sketch_b.ino', 'sketch_c/sketch_c.ino', 'some_path/test_sketch/test_sketch.ino']}
+
+# 14. config_list_fqbn_filter_sketch_only_main
+$ python ../arduino-ci.py config --list fqbn --filter sketch=library_path_a/
+{'fqbn': ['fqbn_a', 'fqbn_b', 'fqbn_c', 'fqbn_c_variant']}
+
+# 15. config_list_fqbn_filter_sketch_in_include
+$ python ../arduino-ci.py config --list fqbn --filter sketch=sketch_a/sketch_a.ino
+{'fqbn': ['fqbn_a', 'fqbn_b', 'fqbn_c', 'fqbn_c_variant', 'fqbn_zzz']}
+
+# 16. config_list_sketch_filter_fqbn_in_exclude
+$ python ../arduino-ci.py config --list sketch --filter fqbn=fqbn_c
+{'sketch': ['a_sketch_to_include_generally.ino', 'library_path_a/', 'sketch_a/sketch_a.ino', 'sketch_c/sketch_c.ino', 'some_path/test_sketch/test_sketch.ino']}
+
