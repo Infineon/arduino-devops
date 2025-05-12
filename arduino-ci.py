@@ -5,18 +5,160 @@ import os
 import sys
 import subprocess
 import yaml
-""" File that needs to be parsed """
 
 # Create logging
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 
 class CiMatrixConfig:
     """
-    Class to parse the release configuration file
+    Class to parse the CI compile sketches configuration file
 
-    The yaml file needs the following keys:
+    The yaml file uses the following keys:
+
+        - sketch: 
+            List sketched to be compiled.
+
+            This key is optional. 
+            If not present the sketches will
+            be discovered in the sketch default paths. Those are:
+                - for cores -> "libraries"
+                - for libraries -> "examples"
+
+            Format:         
+                - directory path which contains sketches. The path should be
+                relative to the asset root path.
+                - .ino sketch path. The path should be relative to the asset root path.
+                Example:
+                sketch:
+                    - SPI/examples/
+                    - examples/some_example/some_example.ino
+
+        - fqbn: 
+            List of boards with format <vendor>:<arch>:<board> against which
+            the "sketch" list will be compiled.
+
+            This key is optional.
+            If not present the fqbn values will:
+                - for cores- > be discovered in the "boards.txt" file
+                - for libraries -> use the defined in the default 
+                "ifx-lib-dflt-ci-config-matrix.yml" provided in this repository.
+            
+            Format:
+                - <vendor>:<arch>:<board>
+                Example:
+                    fqbn:
+                        - vendor:avr:board
+                        - vendor:esp32:board
+        
+        - include:
+            List of dictionaries with key-value pairs which extend the 
+            compile fqbn-sketch matrix. 
+            
+            This key is optional. 
+            Each dictionary of the list can be a list of key-values pairs, 
+            or a single key-value pair.
+            Each modify the default matrix in a different way:
+
+            - Pair of keys: A dictionary with a "fqbn" and "sketch" key. Those 
+            combinations of "fqbn-sketch" (if not already present) will also be
+            added to the default matrix. 
+
+            - Single keys: A dictionary with either "fqbn" or "sketch" key. The
+            values will them be then simply extend the default matrix key. 
+            This is mainly useful when the main matrix is automatically discovered, 
+            and these particular values are "not discoverable".
+
+            The allowed keys are "fqbn" and "sketch". 
+            The value formats allowed are the same as the root node keys. 
+            But in this case, the value can be a list (of scalars) or a scalar.
+
+            Example:
+                include:
+                    # Example of pair of keys to add sketches which 
+                    # should only be compiled for a specific board
+                    - fqbn: vendor:avr:board        # The value of this key can be a scalar or list
+                      sketch:                       # The value of this key can be a scalar or list
+                        - additional_sketch/additional_sketch.ino
+                        - extra_example/extra_example.ino
+                    # A sketch which should be compiled for all the boards
+                    # and not discoverable in the default paths
+                    - sketch: some_hidden_path_sketch/some_hidden_path_sketch.ino
+
+        - exclude:
+            List of dictionaries with key-value pairs which will be excluded from the
+            default fqbn-sketch matrix.
+
+            This key is optional.
+            Each dictionary of the list can be a list of key-values pairs, 
+            or a single key-value pair.
+            Each modify the default matrix in a different way:
+
+            - Pair of keys: A dictionary with a "fqbn" and "sketch" key. Those 
+            combinations of "fqbn-sketch" (if present) will
+            will be removed from the default matrix. 
+
+            - Single keys: A dictionary with either "fqbn" or "sketch" key. The
+            values will them be then (if present) removed from the default matrix key. 
+            This is mainly useful when the main matrix is automatically discovered, 
+            and these particular values are "not discoverable".
+
+            The allowed keys are "fqbn" and "sketch". 
+            The value formats allowed are the same as the root node keys. 
+            But in this case, the value can be a list (of scalars) or a scalar.
+
+            Example:
+                exclude:
+                    # Example of pair of keys to remove sketches which 
+                    # not applicable for a specific board
+                    - fqbn: vendor:avr:board        # The value of this key can be a scalar or list
+                      sketch:                       # The value of this key can be a scalar or list
+                        - SPI/examples/SPI_mode_not_available_for_this_board.ino
+                        - SPI/examples/SPI_mode2_not_available_for_this_board.ino
+                    # A sketch which should be compiled for all the boards
+                    # and not discoverable in the default paths
+                    - sketch: I2C/examples/i2c_example_with_bug/i2c_example_with_bug.ino
+
+        - asset_type:
+            The type of the Arduino asset. 
+            The allowed values are "library" and "core". 
+
+            This key is optional. 
+            If not present, the asset type will be discovered based on the existence of 
+            files required by the Arduino library or platform specifications.
+                - library: "library.properties" file 
+                - core: "platform.txt" and "board.txt" files and "cores" and "variants" directories.
+
+            Example:
+                asset_type: library
     """
     def __init__(self, ci_matrix_yml, asset_root_path):
+        """
+        Constructor of the CI compile matrix configuration class.
+
+        The ci matrix yaml file is parsed and the configuration is 
+        stored in a dictionary.
+        The ci matrix file is optional (for cores). If the file is not present, 
+        or if values for they main keys "fqbn" and/or "sketch", these
+        will be discovered automatically.
+
+        The asset type is also discovered automatically based on:
+            - For libraries, the "sketch" list will be searched in the "examples" folder.
+            The "fqbn list needs to be provided. Therefore, at least the yml file,
+            with the set of "fqbn" is required for libraries.
+
+            - For cores, the directory to search for the "sketch" list is "libraries".
+            The "fqnb" list is extracted from the "boards.txt" file.
+
+        Additionally, if not specified, the asset type is also automatically detected. 
+        The asset type can be either a library or a core. A library is considered when
+        the "library.properties" file is present in the asset root path. 
+        A core is considered when the "platform.txt" and "board.txt" files and
+        the "cores" and "variants" directories are present in the asset root path.
+
+        Args:
+         - ci_matrix_yml (str): The name (including path) the CI matrix configuration file.
+         - asset_root_path (str): The path to the Arduino asset root directory.
+        """
         self.ci_matrix_file = ci_matrix_yml
         self.config = {}
         self.asset_root_path = asset_root_path
@@ -56,6 +198,15 @@ class CiMatrixConfig:
         """
         List all the elements of a given key ("fqbn" or "sketch") in the configuration matrix.
         If filter is provided, it will filter the list based on the value of another key.
+
+        Args:
+            - query_key (str): The key to be queried. The allowed keys are "fqbn" and "sketch".
+            - filter (str): The filter to be applied. The format should be "key=value".
+
+        Returns:
+            - queried_list (dict): A dictionary with the queried key and the list of values.
+            - If the key is not present in the configuration matrix, an directory with an empty list
+            will be returned.
         """
 
         logging.info(f"Querying the configuration matrix for key \"{query_key}\" and filter \"{filter}\"")
@@ -209,7 +360,7 @@ class CiMatrixConfig:
         Discover the asset type based on the root path.
         The asset type can be either a library or a core.
         """
-        if os.path.exists(os.path.join(self.asset_root_path, "library.json")):
+        if os.path.exists(os.path.join(self.asset_root_path, "library.properties")):
             self.asset_type = "library"
         elif os.path.exists(os.path.join(self.asset_root_path, "platform.txt")) and \
              os.path.exists(os.path.join(self.asset_root_path, "boards.txt")) and \
