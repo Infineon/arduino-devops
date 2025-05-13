@@ -851,9 +851,9 @@ class CiParser:
             ]
             compile_proc = subprocess.run(command, capture_output=True, text=True, check=False)
 
-            if compile_proc.stdout == "No platforms matching your search.":
+            if "No platforms matching your search." in compile_proc.stdout:
                 return True
-            
+
             return False
 
         def get_additional_url(config, core):
@@ -870,8 +870,7 @@ class CiParser:
             additional_install_flags = []
             if is_third_party_core(core):
                 ci_config = self.__main_parser_func(args)
-
-                additional_install_flags = ["--additional-urls", get_additional_url(config, core)]
+                additional_install_flags = ["--additional-urls", get_additional_url(ci_config.config, core)]
                 
             command = [
                 "arduino-cli",
