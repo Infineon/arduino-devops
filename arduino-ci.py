@@ -243,7 +243,21 @@ class CiMatrixConfig:
     def __fqbn_list_default(self):
 
         def library_fqbn_list_default():
-            return [] # This will be the default values chosen by Julian. If not added by the library, the arduino-devops can provide one.
+            """
+            """
+            fqbn_list = []
+
+            fqbn_ifx_lib_default_yml = os.path.join(os.path.dirname(__file__),"config", "ci-config-matrix-ifx-lib.yml")
+            try: 
+                with open(fqbn_ifx_lib_default_yml, "r") as f:
+                    logging.info(f"Loading IFX default library fqbn list from \"{fqbn_ifx_lib_default_yml}\"")
+                    fqbn_ifx_lib_default = yaml.safe_load(f)
+                    fqbn_list = fqbn_ifx_lib_default["fqbn"]
+            except FileNotFoundError:
+                logging.error(f"\"{fqbn_ifx_lib_default_yml}\" file not found")
+                sys.exit(1)
+
+            return fqbn_list
         
         def core_fqbn_list_auto_discovery():
 
