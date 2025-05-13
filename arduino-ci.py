@@ -578,6 +578,13 @@ class CiMatrixConfig:
 
         return queried_list
 
+def core_install(fqbn):
+
+    # check if the core is already installed
+    # if not already installed it
+        # if other core, install from arduino index
+    pass
+
 class CiCompileReport:
     def __init__(self):
         self.pass_list = []
@@ -755,6 +762,11 @@ class CiParser:
 
         fqbn_list = get_fqbn_list(self, args)
 
+        library_flags = ""
+        ci_config = self.__main_parser_func(args)
+        if ci_config.asset_type == "library":
+            library_flags = ["--library", "."]
+
         for fqbn in fqbn_list:
             print("\n\033[94m--------------------------------------------------------")
             print(f"--> fqbn: {fqbn}")
@@ -766,8 +778,10 @@ class CiParser:
                     "compile",
                     "--fqbn",
                     fqbn,
-                    sketch
+                    sketch,
                 ]
+                if library_flags != "":
+                    command.extend(library_flags)
 
                 print("\033[94m>> \033[0m", end="")
                 print(f"Compiling \"{sketch}\"", end="", flush=True)
@@ -786,6 +800,103 @@ class CiParser:
             compile_report.summary()
             if compile_report.get_fail_len() > 0:
                 sys.exit(1)
+
+
+    def __core_install_parser_func(self, args):
+
+        def get_fqbn_list(self, args):
+            """
+            Get the list of fqbn for a given sketch.
+            If a fqbn is not provided, then it will get the list
+            from the configuration matrix file.
+            """
+            if args.fqbn is None:
+                ci_config = self.__main_parser_func(args)
+                fqbn_list = ci_config.get_list("fqbn")
+                fqbn_list = fqbn_list["fqbn"]
+            else:
+                fqbn_list = [args.fqbn]
+
+            return fqbn_list
+
+        fqbn_list = get_fqbn_list(self, args)
+
+        def is_board_installed(fqbn):
+            command = [
+                "arduino-cli",
+                "board",
+                "listall",
+            ]
+            compile_proc = subprocess.run(command, capture_output=True, text=True, check=False)
+            # Check if the fqbn is in the list of installed boards
+            if fqbn in compile_proc.stdout:
+                return True
+
+            return False
+
+        def strip_core(fqbn):
+            # From the format <vendor>:<arch>:<board> get the vendor and arch
+            # and return the core name
+            return fqbn.split(":")[0] + ":" + fqbn.split(":")[1]
+
+        def is_third_party_core(core):
+
+            command = [
+                "arduino-cli",
+                "core",
+                "search",
+                core,
+            ]
+            compile_proc = subprocess.run(command, capture_output=True, text=True, check=False)
+
+            if compile_proc.stdout == "No platforms matching your search.":
+                return True
+            
+            return False
+
+        def get_additional_url(config, core):
+
+            for url in config["additional_urls"]:
+                if url["core"] == core:
+                    return url["url"]
+            return None
+        
+        def install_core(fqbn):
+            # Get the core name from the fqbn
+            core = strip_core(fqbn)
+
+            additional_install_flags = []
+            if is_third_party_core(core):
+                ci_config = self.__main_parser_func(args)
+
+                additional_install_flags = ["--additional-urls", get_additional_url(config, core)]
+                
+            command = [
+                "arduino-cli",
+                "core",
+                "install",
+                core
+            ]
+
+            if additional_install_flags != []:
+                command.extend(additional_install_flags)
+
+
+            compile_proc = subprocess.run(command, capture_output=True, text=True, check=False)
+            if compile_proc.returncode != 0:
+                print(compile_proc.stderr)
+            else:
+                if args.verbose:
+                    print(compile_proc.stdout)
+
+        for fqbn in fqbn_list:
+            print(f"Installing core for fqbn: {fqbn}")
+            if is_board_installed(fqbn):
+                print(f"Core for fqbn: {fqbn} is already installed")
+            else:   
+                install_core(fqbn)
+
+
 
     def __create_parser(self):
         """
@@ -902,6 +1013,23 @@ class CiParser:
             default=None,
             help="The sketch to be compiled",
         )
+
+        # Add the config subparser
+        core_install_parser = subparsers.add_parser(
+            "core-install",
+            help="Install the core for a given fqbn",
+        )
+        core_install_parser.set_defaults(func=self.__core_install_parser_func)
+        add_shared_args(core_install_parser)
+
+        # Argument for the compiled fqbn
+        core_install_parser.add_argument(
+            "--fqbn",
+            type=str,
+            default=None,
+            help="The fqbn of the board to be installed",
+        )
+
 
 
 if __name__ == "__main__":
