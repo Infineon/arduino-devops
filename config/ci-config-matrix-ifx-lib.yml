@@ -1,4 +1,5 @@
 fqbn: 
+  - arduino:avr:uno
   - arduino:avr:nano
   - arduino:avr:mega
   - arduino:renesas_uno:minima
@@ -12,3 +13,8 @@ fqbn:
   - Infineon:xmc:XMC1100_Boot_Kit
   - infineon:psoc6:cy8ckit_062s2_ai
 
+additional_urls:
+  - core: Infineon:xmc
+    url:  https://github.com/Infineon/XMC-for-Arduino/releases/latest/download/package_infineon_index.json
+  - core: infineon:psoc6
+    url:  https://github.com/Infineon/arduino-core-psoc6/releases/latest/download/package_psoc6_index.json
