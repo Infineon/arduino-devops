@@ -181,6 +181,9 @@ class CiMatrixConfig:
         if "sketch" not in self.config:
             self.config["sketch"] = self.__sketch_list_default()
 
+        if "additional_urls" not in self.config:
+            self.config["additional_urls"] = []
+
     def __str__(self):
         """Returns json not formatted"""
         return str(self.config)
@@ -254,7 +257,7 @@ class CiMatrixConfig:
                     fqbn_ifx_lib_default = yaml.safe_load(f)
                     fqbn_list = fqbn_ifx_lib_default["fqbn"]
                     if "additional_urls" in fqbn_ifx_lib_default:
-                        self.config["additional_urls"] = fqbn_ifx_lib_default["additional_urls"]
+                        self.config["additional_urls"].extend(fqbn_ifx_lib_default["additional_urls"])
             except FileNotFoundError:
                 logging.error(f"\"{fqbn_ifx_lib_default_yml}\" file not found")
                 sys.exit(1)
