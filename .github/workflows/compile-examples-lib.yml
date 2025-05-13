@@ -1,0 +1,61 @@
+name: Compile library examples
+
+on:
+  workflow_call:
+
+jobs:
+
+  ci-setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+
+    steps:
+      - name: Checkout repository 
+        uses: actions/checkout@v4
+
+      - name: Checkout arduino-devops 
+        uses: actions/checkout@v4
+        with:
+          repository: Infineon/arduino-devops
+          ref: compile-examples-lib
+          path: arduino-devops
+
+      - name: Set build matrix
+        id: set-matrix
+        run: |
+          matrix_ci=$(python ./arduino-devops/arduino-ci.py config --list fqbn)
+          echo $matrix_ci
+          echo "matrix="$matrix_ci"" >> $GITHUB_OUTPUT
+
+  compile-examples:
+    name: ${{ matrix.fqbn }}
+    needs: ci-setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{fromJson(needs.ci-setup.outputs.matrix)}}
+    
+    steps:
+      - name: Checkout repository 
+        uses: actions/checkout@v4
+
+      - name: Checkout arduino-devops
+        uses: actions/checkout@v4
+        with:
+          repository: Infineon/arduino-devops
+          ref: compile-examples-lib
+          path: arduino-devops
+          
+      - name: Install arduino-cli
+        run: |
+          python ./arduino-devops/arduino-cli-install.py 1.2.0
+
+      - name: Install FQBN core
+        run: |
+          echo "installing FQBN core"
+
+      - name: Compile examples
+        run: |
+          python ./arduino-devops/arduino-ci.py compile --fqbn ${{ matrix.fqbn }}
+
