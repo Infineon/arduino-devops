@@ -1,0 +1,14 @@
+fqbn: 
+  - arduino:avr:nano
+  - arduino:avr:mega
+  - arduino:renesas_uno:minima
+  - arduino:renesas_uno:unor4wifi
+  - arduino:samd:mkrzero
+  - Infineon:xmc:XMC1100_XMC2GO
+  - Infineon:xmc:XMC1300_Boot_Kit
+  - Infineon:xmc:XMC1400_XMC2GO
+  - Infineon:xmc:XMC1400_Arduino_Kit
+  - Infineon:xmc:XMC4700_Relax_Kit
+  - Infineon:xmc:XMC1100_Boot_Kit
+  - infineon:psoc6:cy8ckit_062s2_ai
+
