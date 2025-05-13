@@ -181,9 +181,6 @@ class CiMatrixConfig:
         if "sketch" not in self.config:
             self.config["sketch"] = self.__sketch_list_default()
 
-        if "additional_urls" not in self.config:
-            self.config["additional_urls"] = []
-
     def __str__(self):
         """Returns json not formatted"""
         return str(self.config)
@@ -525,7 +522,8 @@ class CiMatrixConfig:
         queried_list = { query_key: [] }
 
         root_node_key_values = self.__get_values_from_root_node_key(filter_key)
-        if filter_value in root_node_key_values:   
+        include_filter_values = self.__get_values_from_modifier_node_key("include", filter_key, single_key_check=True)
+        if filter_value in root_node_key_values or filter_value in include_filter_values:   
             # If the filter_key is present, the query_key will should be
             # and its value is a list
             queried_list[query_key].extend(self.config[query_key])
