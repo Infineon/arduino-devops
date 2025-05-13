@@ -253,6 +253,8 @@ class CiMatrixConfig:
                     logging.info(f"Loading IFX default library fqbn list from \"{fqbn_ifx_lib_default_yml}\"")
                     fqbn_ifx_lib_default = yaml.safe_load(f)
                     fqbn_list = fqbn_ifx_lib_default["fqbn"]
+                    if "additional_urls" in fqbn_ifx_lib_default:
+                        self.config["additional_urls"] = fqbn_ifx_lib_default["additional_urls"]
             except FileNotFoundError:
                 logging.error(f"\"{fqbn_ifx_lib_default_yml}\" file not found")
                 sys.exit(1)
