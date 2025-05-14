@@ -6,12 +6,11 @@ import sys
 import subprocess
 import yaml
 
-# Create logging
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 
 class CiMatrixConfig:
     """
-    Class to parse the CI compile sketches configuration file
+    Class to parse the CI compile sketches configuration file.
 
     The yaml file uses the following keys:
 
@@ -41,7 +40,7 @@ class CiMatrixConfig:
             If not present the fqbn values will:
                 - for cores- > be discovered in the "boards.txt" file
                 - for libraries -> use the defined in the default 
-                "ifx-lib-dflt-ci-config-matrix.yml" provided in this repository.
+                "config/ci-config-matrix-ifx-lib.yml" provided in this repository.
             
             Format:
                 - <vendor>:<arch>:<board>
@@ -76,8 +75,8 @@ class CiMatrixConfig:
                 include:
                     # Example of pair of keys to add sketches which 
                     # should only be compiled for a specific board
-                    - fqbn: vendor:avr:board        # The value of this key can be a scalar or list
-                      sketch:                       # The value of this key can be a scalar or list
+                    - fqbn: vendor:avr:board   # The value of this key can be a scalar or list
+                      sketch:                  # The value of this key can be a scalar or list
                         - additional_sketch/additional_sketch.ino
                         - extra_example/extra_example.ino
                     # A sketch which should be compiled for all the boards
@@ -110,8 +109,8 @@ class CiMatrixConfig:
                 exclude:
                     # Example of pair of keys to remove sketches which 
                     # not applicable for a specific board
-                    - fqbn: vendor:avr:board        # The value of this key can be a scalar or list
-                      sketch:                       # The value of this key can be a scalar or list
+                    - fqbn: vendor:avr:board    # The value of this key can be a scalar or list
+                      sketch:                   # The value of this key can be a scalar or list
                         - SPI/examples/SPI_mode_not_available_for_this_board.ino
                         - SPI/examples/SPI_mode2_not_available_for_this_board.ino
                     # A sketch which should be compiled for all the boards
@@ -127,9 +126,22 @@ class CiMatrixConfig:
             files required by the Arduino library or platform specifications.
                 - library: "library.properties" file 
                 - core: "platform.txt" and "board.txt" files and "cores" and "variants" directories.
-
+        
             Example:
                 asset_type: library
+
+        - additional_urls:
+            List of dictionaries with key-value pairs with the the keys "core" and "url".
+            This key is optional. 
+            The "core" key is the name of the core to be installed, with format <vendor>:<arch>.
+            The "url" key is the url pointing to the package index json file required by Arduino 
+            to install third-party cores.
+
+            Example:
+                additional_urls:
+                    - core: esp32:esp32
+                      url: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+
     """
     def __init__(self, ci_matrix_yml, asset_root_path):
         """
@@ -137,20 +149,25 @@ class CiMatrixConfig:
 
         The ci matrix yaml file is parsed and the configuration is 
         stored in a dictionary.
-        The ci matrix file is optional (for cores). If the file is not present, 
+
+        For cores, the ci matrix file is optional. If the file is not present, 
         or if values for they main keys "fqbn" and/or "sketch", these
         will be discovered automatically.
 
+        For libraries, a list of "fqbn" is not discoverable. 
+        A default one is set in config for Infineon libraries to make it the need
+        of a ci matrix config file optional.
+
         The asset type is also discovered automatically based on:
             - For libraries, the "sketch" list will be searched in the "examples" folder.
-            The "fqbn list needs to be provided. Therefore, at least the yml file,
+            The "fqbn" list needs to be provided. Therefore, at least the yml file,
             with the set of "fqbn" is required for libraries.
 
             - For cores, the directory to search for the "sketch" list is "libraries".
             The "fqnb" list is extracted from the "boards.txt" file.
 
         Additionally, if not specified, the asset type is also automatically detected. 
-        The asset type can be either a library or a core. A library is considered when
+        The asset type can be either a "library" or a "core". A library is considered when
         the "library.properties" file is present in the asset root path. 
         A core is considered when the "platform.txt" and "board.txt" files and
         the "cores" and "variants" directories are present in the asset root path.
@@ -188,7 +205,6 @@ class CiMatrixConfig:
     def __str__as_yml(self):
         """Uses yaml dump to generate a string"""
         return yaml.dump(self.config, indent=4, default_flow_style=False)
-        return str(self.config)
     
     def __str__as_json_pretty(self):
         """Uses json dump to generate a pretty string"""
@@ -197,7 +213,8 @@ class CiMatrixConfig:
     def get_list(self, query_key, filter=None):
         """
         List all the elements of a given key ("fqbn" or "sketch") in the configuration matrix.
-        If filter is provided, it will filter the list based on the value of another key.
+        If a filter is provided, it will filter the list based on the value of filter key.
+        The list is sorted in alphabetical order.
 
         Args:
             - query_key (str): The key to be queried. The allowed keys are "fqbn" and "sketch".
@@ -205,11 +222,9 @@ class CiMatrixConfig:
 
         Returns:
             - queried_list (dict): A dictionary with the queried key and the list of values.
-            - If the key is not present in the configuration matrix, an directory with an empty list
+            - If the key is not present in the configuration matrix, an dictionary with an empty list
             will be returned.
         """
-
-        logging.info(f"Querying the configuration matrix for key \"{query_key}\" and filter \"{filter}\"")
 
         queried_list = { query_key: [] }
 
@@ -220,15 +235,32 @@ class CiMatrixConfig:
             else:
                 queried_list = self.__filtered_query(query_key, filter)
 
-        
         queried_list[query_key] = sorted(queried_list[query_key], key=str.lower)
         
         return queried_list
-        
+
+    def get_additional_url(self, core):
+        """
+        Gets the additional url for a given core.
+        Args:
+            - core (str): The core to be queried. The format should be <vendor>:<arch>.
+        Returns:
+            - url (str): The url for the core.
+            - None if the core is not found in the additional urls list.
+        """
+        if "additional_urls" in self.config:
+            for node in self.config["additional_urls"]:
+                if "core" in node:
+                    if node["core"] == core:
+                        return node["url"]
+        return None
+
     """ Private methods """
 
     def __parse_config(self):
-        """Parses the matrix ci yml file"""
+        """
+        Parses the matrix ci yml file and returns the config as a dictionary.
+        """
         config = {}
         try:
             with open(self.ci_matrix_file, "r") as f:
@@ -241,19 +273,35 @@ class CiMatrixConfig:
         return config
 
     def __fqbn_list_default(self):
+        """
+        Discover the fqbn list based on the asset type.
+
+        Returns:
+            - fqbn_list (list): A list of fqbn.
+        """
 
         def library_fqbn_list_default():
             """
+            Discover the fqbn list for libraries.
+            The fqbn list is loaded from the config/ci-config-matrix-ifx-lib.yml file.
+            The file should contain a list of fqbn and additional urls (for third party cores).
+
+            Returns:
+                - fqbn_list (list): A list of fqbn.
             """
             fqbn_list = []
 
             fqbn_ifx_lib_default_yml = os.path.join(os.path.dirname(__file__),"config", "ci-config-matrix-ifx-lib.yml")
             try: 
                 with open(fqbn_ifx_lib_default_yml, "r") as f:
-                    logging.info(f"Loading IFX default library fqbn list from \"{fqbn_ifx_lib_default_yml}\"")
+                    logging.warning(f"Loading IFX default library fqbn list from \"{fqbn_ifx_lib_default_yml}\"")
                     fqbn_ifx_lib_default = yaml.safe_load(f)
+                    
                     fqbn_list = fqbn_ifx_lib_default["fqbn"]
+                    
                     if "additional_urls" in fqbn_ifx_lib_default:
+                        if "additional_urls" not in self.config:
+                            self.config["additional_urls"] = []
                         self.config["additional_urls"].extend(fqbn_ifx_lib_default["additional_urls"])
             except FileNotFoundError:
                 logging.error(f"\"{fqbn_ifx_lib_default_yml}\" file not found")
@@ -262,65 +310,131 @@ class CiMatrixConfig:
             return fqbn_list
         
         def core_fqbn_list_auto_discovery():
+            """
+            Discover the fqbn list for cores.
+            The board name list is loaded from the boards.txt file.
+            The vendor and architecture are loaded from the package index template file.
+            These are combined to create the fqbn list.
 
-            fqbn_list = []
-                    
-            boards_txt = os.path.exists(os.path.join(self.asset_root_path, "boards.txt"))
-            if not boards_txt:
-                logging.error(f"\"boards.txt\" file not found in the asset root path \"{self.asset_root_path}\"")
-                sys.exit(1)
+            Returns:
+                - fqbn_list (list): A list of fqbn.
+            """
+
+            def load_board_txt():
+                """
+                Loads the content of the boards.txt file.
+                If the file is not present, it will exit the program on error.
+
+                Returns:
+                    - boards_txt_content (str): The content of the boards.txt file.
+                """
+                boards_txt = os.path.exists(os.path.join(self.asset_root_path, "boards.txt"))
+                if not boards_txt:
+                    logging.error(f"\"boards.txt\" file not found in the asset root path \"{self.asset_root_path}\"")
+                    sys.exit(1)
+                
+                # Load content of boards.txt file
+                with open(os.path.join(self.asset_root_path, "boards.txt"), "r") as f:
+                    boards_txt_content = f.read()
+                
+                return boards_txt_content
+
+            def get_board_name_list(boards_txt_content):
+                """
+                The function will get the board name list from the boards.txt content.
+                The board name is the prefix of the line with the pattern:
+                
+                <prefix>.name=<board_name>
+
+                Args: 
+                    - boards_txt_content (str): The content of the boards.txt file.
+                
+                Returns:
+                    - board_name_list (list): A list of board names.
+                """
+                board_name_list = []
+
+                for line in boards_txt_content.splitlines():
+                    # Skip comments and empty lines
+                    if line.startswith("#") or line.strip() == "":
+                        continue
+                    if ".name=" in line:
+                        prefix = line.split(".name=")[0].strip()
+                        if prefix not in board_name_list:
+                            board_name_list.append(prefix)
+
+                # Remove duplicates
+                board_name_list = list(set(board_name_list))
+
+                return board_name_list
             
-            # Load content of boards.txt file
-            with open(os.path.join(self.asset_root_path, "boards.txt"), "r") as f:
-                boards_txt_content = f.read()
+            def get_vendor_core_name():
+                """
+                The vendor and core name are extracted from the package index template file.
+                The file should be in the "package" directory of the asset root path.
+                The JSOn file should contain in the name the the substring "package" and "index".
+                The file should be a json file with the following structure:
+                {
+                    "packages": [
+                        {
+                            "name": "<vendor>",
+                            "platforms": [
+                                {
+                                    "architecture": "<arch>"
+                                }
+                            ]
+                        }
+                    ]
+                }
+                
+                Returns:
+                    - vendor_name (str): The vendor name.
+                    - arch_name (str): The architecture name.
+                """
+                # Find vendor and core name
+                package_index_template_dir = os.path.join(self.asset_root_path, "package")
+                if not os.path.exists(package_index_template_dir):
+                    logging.error(f"\"package\" dir not found in the asset root path \"{self.asset_root_path}\"")
+                    sys.exit(1)
 
-            # look for the lines with pattern <prefix>.name=<board_name> and
-            # extract the prefix in board_txt_content
-            # The prefix is the fqbn
-   
-            board_name_list = []
-            for line in boards_txt_content.splitlines():
-                if line.startswith("#") or line.strip() == "":
-                    continue
-                if ".name=" in line:
-                    prefix = line.split(".name=")[0].strip()
-                    if prefix not in board_name_list:
-                        board_name_list.append(prefix)
-                        logging.info(f"Found fqbn: \"{prefix}\"")
+                # Find in the dir a .json file
+                for root, dirs, files in os.walk(package_index_template_dir):
+                    for file in files:
+                        if file.endswith(".json") and "package" in file and "index" in file:
+                            package_index_template_file = os.path.join(root, file)
+                            break
 
-            # remove duplicates
-            board_name_list = list(set(board_name_list))
+                # Load content of package_index_template_file   
+                with open(package_index_template_file, "r") as f:
+                    package_index_template_content = json.load(f)
 
-            # Find vendor and core name
-            package_index_template_dir = os.path.join(self.asset_root_path, "package")
-            if not os.path.exists(package_index_template_dir):
-                logging.error(f"\"package\" dir not found in the asset root path \"{self.asset_root_path}\"")
-                sys.exit(1)
+                try:
+                    vendor_name = package_index_template_content["packages"][0]["name"]
+                    arch_name = package_index_template_content["packages"][0]["platforms"][0]["architecture"]
+                except KeyError:
+                    logging.error(f"Key not found in the package index template file \"{package_index_template_file}\"")
+                    sys.exit(1)
 
-            # Find in the dir a .json file
-            for root, dirs, files in os.walk(package_index_template_dir):
-                for file in files:
-                    if file.endswith(".json") and "package" in file and "index" in file:
-                        package_index_template_file = os.path.join(root, file)
-                        break
+                return vendor_name, arch_name
 
-            # Load content of package_index_template_file   
-            with open(package_index_template_file, "r") as f:
-                package_index_template_content = json.load(f)
+            """
+            Main core fqbn list discovery function.
+            """
+            fqbn_list = []
 
-            try:
-                vendor_name = package_index_template_content["packages"][0]["name"]
-                arch_name = package_index_template_content["packages"][0]["platforms"][0]["architecture"]
-            except KeyError:
-                logging.error(f"Key not found in the package index template file \"{package_index_template_file}\"")
-                sys.exit(1)
+            boards_txt_content = load_board_txt()
+            board_name_list = get_board_name_list(boards_txt_content)
+            vendor_name, arch_name = get_vendor_core_name()
 
             for board in board_name_list:
                 fqbn = f"{vendor_name}:{arch_name}:{board}"
                 fqbn_list.append(fqbn)
-                logging.info(f"Found fqbn: \"{fqbn}\"")
 
             return fqbn_list
+        
+        """
+        Main function to discover the fqbn list based on the asset type.
+        """
 
         fqbn_list = []
         if self.asset_type == "library":
@@ -334,12 +448,28 @@ class CiMatrixConfig:
         return fqbn_list
 
     def __sketch_list_default(self):
+        """
+        Discover the sketch list based on the asset type.
+        The list is generated based on the default sketch paths.
+        The sketch paths are:
+            - For libraries: "examples"
+            - For cores: "libraries"
+        The sketch paths are relative to the asset root path.
 
+        Returns:
+            - sketch_list (list): A list of sketches.
+        """
         def sketch_list_auto_discovery(sketch_path_list):
+            """
+            Walks through the directories in the sketch path list and
+            returns a list of all the .ino files found in the directories.
+
+            Args:
+                sketch_path_list (list of str): List of directories to search for sketches.
+            """
             sketch_list = []
 
             for sketch_path in sketch_path_list:
-                # The default search path is the "sketch" folder
                 sketch_path_abs = os.path.join(self.asset_root_path, sketch_path)
                 if not os.path.exists(sketch_path_abs):
                     logging.warning(f"\"{sketch_path}\" dir not found in the asset root path \"{self.asset_root_path}\"")
@@ -354,10 +484,12 @@ class CiMatrixConfig:
                             sketch_with_full_path = os.path.join(root, file)
                             sketch_with_relative_path = os.path.relpath(sketch_with_full_path, self.asset_root_path)
                             sketch_list.append(sketch_with_relative_path)
-                            logging.info(f"Found sketch: \"{sketch_with_relative_path}\"")
-
         
             return sketch_list
+
+        """
+        Main function to discover the sketch list based on the asset type.
+        """
 
         sketch_list = []
         if self.asset_type == "library":
@@ -373,8 +505,12 @@ class CiMatrixConfig:
 
     def __asset_type_discover(self):
         """
-        Discover the asset type based on the root path.
+        Discover the asset type based on the root path content,
+        and set the asset type in the configuration matrix.
         The asset type can be either a library or a core.
+            - A library is considered when the "library.properties" file is present in the asset root path.
+            - A core is considered when the "platform.txt" and "board.txt" files and
+            the "cores" and "variants" directories are present in the asset root path.
         """
         if os.path.exists(os.path.join(self.asset_root_path, "library.properties")):
             self.asset_type = "library"
@@ -397,10 +533,11 @@ class CiMatrixConfig:
 
         Args:
             key (str): The key to be validated.
-        """
-        
-        logging.info(f"Validating key: \"{key}\"")
-        
+
+        Returns:
+            - True if the key is valid.
+            - False if the key is not valid.
+        """        
         allowed_list_keys = ["fqbn", "sketch"]
 
         if key not in allowed_list_keys:
@@ -409,13 +546,11 @@ class CiMatrixConfig:
 
         key_in_config = False
         if key in self.config:
-            logging.info(f"Key \"{key}\" found in the configuration matrix")
             key_in_config = True
         else:
             if "include" in self.config:
                 for entry in self.config["include"]:
                     if key in entry:
-                        logging.info(f"Key \"{key}\" found in \"include\" list")
                         key_in_config = True
                         break
         
@@ -426,16 +561,41 @@ class CiMatrixConfig:
         return True
 
     def __get_values_from_root_node_key(self, key):
+        """
+        Get the values from a dictionary key in the root node of the 
+        configuration matrix.
+        The value is always lists of scalars for root main matrix keys
+        "fqbn" and "sketch".
+        Args: 
+            - key (str): The key to be queried. The allowed keys are "fqbn" and "sketch".
+
+        Returns:
+            - values (list): A list of values for the queried key.
+        """
         values = []
 
         if key in self.config:
-            # This should be always a list # TODO: Add validation in separate method.
             values = self.config[key]
 
         return values
 
     def __get_values_from_modifier_node_key(self, node, key, single_key_check=False):
-        
+        """
+        Get the values from a dictionary key modifying the main fqbn-sketch matrix.
+        These "modifier" nodes are "include" and "exclude".
+        These values always contain a list of dictionaries.
+        The dictionaries can contain either a pair of keys or a single key.
+        The pair of keys are "fqbn" and "sketch". 
+        The single key can be either "fqbn" or "sketch".
+
+        Args:
+            - node (str): The node to be queried. The allowed nodes are "include" and "exclude".
+            - key (str): The key to be queried. The allowed keys are "fqbn" and "sketch".
+            - single_key_check (bool): If True, it will return the key only if it is a single key.
+
+        Returns:
+            - values (list): A list of values for the queried key.
+        """
         def single_pair_key_check(node, single_key_check):
             if single_key_check:
                 if len(node) != 1:
@@ -457,7 +617,22 @@ class CiMatrixConfig:
         return values
 
     def __get_filtered_values_from_modifier_node_key(self, node, query_key, filter_key, filter_value):
+        """
+        Get the values from a dictionary key modifying the main fqbn-sketch matrix matching a filter.
+        If the filter key-value pair present in one of the dictionaries of the list in the node, 
+        then the queried key value of that dictionary will be returned.
+        The node is either "include" or "exclude".
+        The child node needs to have both the filter key and the query key.
+
+        Args:
+            - node (str): The node to be queried. The allowed nodes are "include" and "exclude".
+            - query_key (str): The key to be queried. The allowed keys are "fqbn" and "sketch".
+            - filter_key (str): The key to be filtered. The allowed keys are "fqbn" and "sketch".
+            - filter_value (str): The value to be filtered.
         
+        Returns:
+            - values (list): A list of values for the queried key.
+        """
         values = []
 
         if node in self.config:
@@ -479,10 +654,22 @@ class CiMatrixConfig:
 
     def __query(self, query_key):
         """
-        It will return the list of values for the queried key.
-        The key is present at least in:
-            - As main node key of the default configuration matrix
-            - As part of the "include" key
+        Gets the list of values for the queried key.
+        The list of values is generated based on the following rules:
+        - The values from the root node key are always included.
+        - The values from the include node are also included.
+        - The values from the exclude node are removed from list when both of
+        these conditions are met:
+            - The value present in the root node and or the include node.
+            - The value is a single key in the exclude node.
+
+        Args:
+            - query_key (str): The key to be queried. The allowed keys are "fqbn" and "sketch".
+        
+        Returns:
+            - queried_list (dict): A dictionary with the queried key and the list of values.
+            - If the key is not present in the configuration matrix, an dictionary with an empty list
+            will be returned.
         """
         queried_list = { query_key: [] }
 
@@ -505,9 +692,17 @@ class CiMatrixConfig:
 
     def __query_same_list_and_filter_key(self, query_filter_key, filter_value):
         """
-        If the filter key is the same as the list, the user is
-        querying if the value is present in the configuration in 
-        the main matrix or in the include/exclude.
+        Gets the value for the queried key and filter key.
+        As the key is the same, this is a simple query, which will return the value
+        if that is present in the list of values for the queried key.
+
+        Args:
+            - query_filter_key (str): The key to be queried and filtered. The allowed keys are "fqbn" and "sketch".
+            - filter_value (str): The value to be filtered.
+        Returns:
+            - queried_list (dict): A dictionary with the queried key and the list of values.
+            - If the key is not present in the configuration matrix, an dictionary with an empty list
+            will be returned.
         """
         queried_list = { query_filter_key: [] }
 
@@ -518,7 +713,34 @@ class CiMatrixConfig:
         return queried_list
             
     def __query_diff_list_and_filter_key(self, query_key, filter_key, filter_value):
+        """
+        Gets the list of values for the queried key and a filter key. 
+        The query key and filter key are different.
 
+        The list of values is generated based on the following rules:
+        - When the filter value is present in the root node key, the complete list of 
+        the queried key in the root node will be added.
+        - When the filter value is present in the include node as single key, 
+        the complete list of the queried key in the root node will be added.
+        - When the query key is present in the include node as single key and there is
+        already a query list, the values from the include node will be added to the list.
+        - When the filter value is present in the include node as pair of keys, the value 
+        of the query key will be added to the list.
+        - When the filter value is present in the exclude node as pair of keys, the value of
+        the query key will be removed from the list (if existing in the queried list).
+        - When the query key is present in the exclude node as single key, the value of the 
+        query key will be removed from the list (if existing in the queried list).
+
+        Args:
+            - query_key (str): The key to be queried. The allowed keys are "fqbn" and "sketch".
+            - filter_key (str): The key to be filtered. The allowed keys are "fqbn" and "sketch".
+            - filter_value (str): The value to be filtered.
+        
+        Returns:
+            - queried_list (dict): A dictionary with the queried key and the list of values.
+            - If the key is not present in the configuration matrix, an dictionary with an empty list
+            will be returned.
+        """
         queried_list = { query_key: [] }
 
         root_node_key_values = self.__get_values_from_root_node_key(filter_key)
@@ -528,7 +750,7 @@ class CiMatrixConfig:
             # and its value is a list
             queried_list[query_key].extend(self.config[query_key])
 
-        # If there is already a base list, add any additional value which applies to the whole matrix
+        # If there is already a list, add any additional value which applies to the whole matrix
         if queried_list[query_key] != []:
             include_values = self.__get_values_from_modifier_node_key("include", query_key, single_key_check=True)
             queried_list[query_key].extend(include_values)
@@ -553,7 +775,17 @@ class CiMatrixConfig:
 
     def __filtered_query(self, query_key, filter):
         """
-        It will return the list of values for the queried key and a filter.
+        Gets the list of values for the queried key and a filter.
+        The filter is a key-value pair. The filter key can be either "fqbn" or "sketch".
+
+        Args:
+            - query_key (str): The key to be queried. The allowed keys are "fqbn" and "sketch".
+            - filter (str): The filter to be applied. The format should be "key=value".
+        
+        Returns:
+            - queried_list (dict): A dictionary with the queried key and the list of values.
+            - If the key is not present in the configuration matrix, an dictionary with an empty list
+            will be returned.
         """
         def __validate_filter(filter): 
             # The filter format should be "key=value"
@@ -570,7 +802,6 @@ class CiMatrixConfig:
             return queried_list
             
         filter_key, filter_value = filter.split("=")
-        logging.info(f"Filtering for key \"{filter_key}\" with value \"{filter_value}\"")
 
         if self.__is_key_valid(filter_key):
 
@@ -581,17 +812,192 @@ class CiMatrixConfig:
 
         return queried_list
 
-def core_install(fqbn):
 
-    # check if the core is already installed
-    # if not already installed it
-        # if other core, install from arduino index
-    pass
+class CiCoreInstaller():
+    """
+    This class is used to install the Arduino core for the 
+    fqbn required in CI.
+    """
+    def  __init__(self, ci_config):
+        """
+        Creates the CiCoreInstaller object.
+
+        The ci_config is used to identify which fqnb and
+        cores need to be installed when no specific fqbn 
+        is provided.
+        Args:
+            - ci_config (CiCompileMatrix): The configuration matrix object.
+        """
+        self.ci_config = ci_config
+
+    def install(self, fqbn=None):
+        """
+        Installs the core for the fqbn list in the matrix.
+        
+        Args:
+            - fqbn (str): The fqbn to be installed. If not provided, 
+            the complete fqbn list in the ci configuration matrix will
+            be installed.
+        """
+        fqbn_list = self.__get_fqbn_list(fqbn)
+        for fqbn in fqbn_list:
+            if not self.__is_core_installed(fqbn):
+                print(f"Installing core for fqbn \"{fqbn}\"")
+                self.__install_core(fqbn)
+            else:   
+                print(f"Core for fqbn \"{fqbn}\" is already installed.")
+
+
+    """ Private methods """
+
+    def __get_fqbn_list(self, fqbn=None):
+        """
+        Gets the list of fqbn.
+        If a fqbn is provided, then the list will contain only that fqbn.
+
+        Args:
+            - fqbn (str): The fqbn to be installed. If not provided,
+        
+        Returns:
+            - fqbn_list (list): A list of fqbn to be installed.
+        """
+        if fqbn is None:
+            fqbn_list = self.ci_config.get_list("fqbn")
+            fqbn_list = fqbn_list["fqbn"]
+        else:
+            fqbn_list = [fqbn]
+
+        return fqbn_list
+
+    @staticmethod
+    def __is_core_installed(fqbn):
+        """
+        Checks if the core is installed for the provided fqbn.
+
+        It will check if the fqbn is in the list of installed boards,
+        using the "arduino-cli board listall" command.
+
+        Args:
+            - fqbn (str): The fqbn to be checked.
+
+        Returns:
+            - True if the core is installed.
+            - False if the core is NOT installed.
+        """
+        command = [
+            "arduino-cli",
+            "board",
+            "listall",
+        ]
+        board_list_proc = subprocess.run(command, capture_output=True, text=True, check=False)
+        # Check if the fqbn is in the list of installed boards
+        if fqbn in board_list_proc.stdout:
+            return True
+
+        return False
+        
+    def __install_core(self, fqbn):
+        """
+        Installs the core for the provided fqbn.
+        It will check if the core is a third party core, and if so,
+        it will use the additional url provided in the ci config file.
+        The core is installed using the "arduino-cli core install" command.
+
+        Args:
+            - fqbn (str): The fqbn to be installed.
+        
+        """
+        core = self.__strip_core(fqbn)
+
+        additional_install_flags = []
+        if self.__is_third_party_core(core):
+            additional_install_flags = ["--additional-urls", self.ci_config.get_additional_url(core)]
+            if additional_install_flags[1] is None:
+                logging.error(f"Error getting additional url for core \"{core}\"")
+                sys.exit(1)
+
+        command = [
+            "arduino-cli",
+            "core",
+            "install",
+            core
+        ]
+
+        if additional_install_flags != []:
+            command.extend(additional_install_flags)
+
+        core_install_proc = subprocess.run(command, capture_output=True, text=True, check=False)
+        if core_install_proc.returncode != 0:
+            logging.error(f"Error installing core for fqbn: {fqbn}")
+            print(core_install_proc.stderr)
+        else:
+            print(f"Core for fqbn \"{fqbn}\" installed successfully.")
+
+
+    @staticmethod
+    def __strip_core(fqbn):
+        """
+        Strips the core name from the fqbn.
+        The core name is the vendor and architecture name.
+        The fqbn is in the format <vendor>:<arch>:<board>.
+        The core name is in the format <vendor>:<arch>.
+
+        Args:
+            - fqbn (str): The fqbn to be stripped.
+
+        Returns:
+            - core (str): The core name in the format <vendor>:<arch>.
+        """
+        try:
+            return fqbn.split(":")[0] + ":" + fqbn.split(":")[1]
+        except IndexError:
+            logging.error(f"Error getting core name from fqbn \"{fqbn}\".\n \
+            \rA valid fqbn should be in the format <vendor>:<arch>:<board>.")
+            sys.exit(1)
+
+    @staticmethod
+    def __is_third_party_core(core):
+        """
+        Checks if the core is a third party core.
+        It will check if the core is searchable using the 
+        "arduino-cli core search" command.
+
+        Args:
+            - core (str): The core to be checked.
+        
+        Returns:
+            - True if the core is a third party core.
+            - False if the core is an Arduino official/built-in core.
+        """
+        command = [
+            "arduino-cli",
+            "core",
+            "search",
+            core,
+        ]
+        core_search_proc = subprocess.run(command, capture_output=True, text=True, check=False)
+
+        if "No platforms matching your search." in core_search_proc.stdout:
+            return True
+
+        return False
+        
 
 class CiCompileReport:
-    def __init__(self):
+    """
+    Class that generates the compile report for the compile sketches.
+    Takes care as well of the the showed format of the results.
+    """
+    blue_on = "\033[94m"
+    green_on = "\033[92m"
+    red_on = "\033[91m"
+    grey_on = "\033[90m"
+    color_off = "\033[0m"
+
+    def __init__(self, fqbn):
         self.pass_list = []
         self.fail_list = []
+        self.fqbn = fqbn
 
     def add_pass(self, sketch):
         self.pass_list.append(sketch)
@@ -609,25 +1015,251 @@ class CiCompileReport:
         return len(self.pass_list) + len(self.fail_list)
 
     def summary(self):
-        print("\033[94m--------------------------------------------------------")
-        print("----------- Compile sketches report summary ------------")
-        print("--------------------------------------------------------\033[0m")
+        print(f"{self.blue_on}--------------------------------------------------------{self.color_off}")
+        self.__summary_result()
+        print(f"{self.blue_on}--------------------------------------------------------{self.color_off}")
 
+    def print_fqbn_header(self):
+        print(f"{CiCompileReport.blue_on}--------------------------------------------------------")
+        print(f"--> fqbn: {self.fqbn}")
+        print(f"--------------------------------------------------------{CiCompileReport.color_off}")
+
+    @staticmethod
+    def print_sketch_compile_header(sketch):
+        print(f"{CiCompileReport.blue_on}>> {CiCompileReport.color_off}", end="")
+        print(f"Compiling \"{sketch}\"", end="", flush=True)
+
+    @staticmethod
+    def print_pass_tag():
+        print(f"{CiCompileReport.green_on} [PASS] {CiCompileReport.color_off}")
+    
+    @staticmethod
+    def print_fail_tag():
+        print(f"{CiCompileReport.red_on} [FAIL] {CiCompileReport.color_off}")
+
+    @staticmethod
+    def print_exclude_tag():
+        print(f"{CiCompileReport.grey_on} [EXCLUDED] {CiCompileReport.color_off}")
+
+    @staticmethod
+    def summary_multiple(reports):
+        print(f"\n{CiCompileReport.blue_on}--------------------------------------------------------")
+        print("----------- Compile sketches report summary ------------")
+        print(f"--------------------------------------------------------{CiCompileReport.color_off}")
+        for report in reports:
+            print(f"{CiCompileReport.blue_on} - {report.fqbn}{CiCompileReport.color_off} : ", end="")
+            report.__summary_result()
+        print(f"{CiCompileReport.blue_on}--------------------------------------------------------{CiCompileReport.color_off}")
+
+    """ Private methods """
+
+    def __summary_result(self):
+        """
+        A different format is used depending if all sketches has failed, all has passed,
+        or some has passed and some has failed.
+        """
         if self.get_total_len() == self.get_pass_len():
-            print(f"All \033[92m{self.get_total_len()}\033[0m sketches \033[92mPASSED\033[0m !! :) ")
+            print(f"All {self.green_on}{self.get_total_len()}{self.color_off} sketches {self.green_on}PASSED{self.color_off}")
         else:
             if self.get_pass_len() > 0:
-                print(f"Only \033[92m{self.get_pass_len()}\033[0m out of \033[94m{self.get_total_len()}\033[0m sketches PASSED")
+                print(f"Only {self.green_on}{self.get_pass_len()}{self.color_off} out of {self.blue_on}{self.get_total_len()}{self.color_off} sketches PASSED")
 
             if self.get_fail_len() > 0:
                 if self.get_pass_len() == 0:
-                    print(f"All {self.get_total_len()} sketches \033[91mFAILED\033[0m")
+                    print(f"All {self.get_total_len()} sketches {self.red_on}FAILED{self.color_off}")
                 else:
-                    print(f"The following sketches have \033[91mFAILED\033[0m")
+                    print(f"The following sketches have {self.red_on}FAILED{self.color_off}")
                 for sketch in self.fail_list:
                     print(f"   - {sketch}")
 
-        print("\033[94m--------------------------------------------------------\033[0m")
+class CiCompiler:
+    """
+    Class to handle the ci matrix of fqbn-sketch compilation and result display. 
+    """
+
+    def __init__(self, ci_config):
+        """
+        The constructor creates the CiCompiler object.
+        The ci_config is used to access the fqbn-sketch matrix and the sketches 
+        to be compiled against the fqbn list.
+
+        Args:
+            - ci_config (CiCompileMatrix): The configuration matrix object.
+        """
+        self.ci_config = ci_config
+        self.compile_reports = [] 
+
+    def compile(self, fqbn=None, sketch=None):
+        """
+        Compiles the sketches for the fqbn list in the matrix.
+        If a fqbn is provided, then only that fqbn will be compiled.
+        If a sketch is provided, then only that sketch will be compiled.
+        If no fqbn or sketch is provided, then the complete matrix will be compiled.
+        The sketches are compiled using the "arduino-cli compile" command.
+
+        If any of the sketches fails to compile, the script will exit with code 1.
+
+        Args:
+            - fqbn (str): The fqbn to be compiled. If not provided, 
+            the complete fqbn list in the ci configuration matrix will
+            be compiled.
+            - sketch (str): The sketch to be compiled. If not provided,
+            the complete sketch list in the ci configuration matrix will
+            be compiled.
+        """
+
+        fqbn_list = self.__get_fqbn_list(fqbn)
+        for fqbn in fqbn_list:
+            
+            fqbn_report = CiCompileReport(fqbn)
+            self.compile_reports.append(fqbn_report)
+            fqbn_report.print_fqbn_header()
+
+            
+            fqbn_sketch_list = self.__get_sketch_file_list(fqbn, sketch)
+            all_sketch_list = self.__get_sketch_file_list_no_dirs(self.ci_config.get_list("sketch")["sketch"])
+            
+            for sketch_file in all_sketch_list:
+                # Report this sketch is excluded 
+                if sketch_file not in fqbn_sketch_list:
+                    CiCompileReport.print_sketch_compile_header(sketch_file)
+                    CiCompileReport.print_exclude_tag()
+                    continue
+
+                self.__compile_sketch(fqbn, sketch_file, fqbn_report)
+
+            fqbn_report.summary()
+
+        # Only multiple fqbn are compiled, create a summary report
+        if len(self.compile_reports) > 1:
+            CiCompileReport.summary_multiple(self.compile_reports)
+
+        for report in self.compile_reports:
+            if report.get_fail_len() > 0:
+                sys.exit(1)
+
+    """ Private methods """
+
+    def __get_fqbn_list(self, fqbn=None):
+        """
+        Gets the list of fqbn.
+        If a fqbn is provided, then the list will contain only that fqbn.
+
+        Args:
+            - fqbn (str): The fqbn to be installed. If not provided,
+        
+        Returns:
+            - fqbn_list (list): A list of fqbn to be installed.
+        """
+        if fqbn is None:
+            fqbn_list = self.ci_config.get_list("fqbn")
+            fqbn_list = fqbn_list["fqbn"]
+        else:
+            fqbn_list = [fqbn]
+
+        return fqbn_list
+
+    def __get_sketch_file_list_no_dirs(self, sketch_list):
+        """
+        Get the list of sketches for a given sketch list.
+        If a sketch is not a .ino file, then it is a directory containing
+        .ino files. Discover all the .ino files in the directory and
+        add them to the sketch list, and remove the directory from the list.
+
+        Args:
+            - sketch_list (list): The list of sketches to be processed.
+        
+        Returns:
+            - sketch_list (list): The list of sketches with all the .ino files
+            discovered in the directories.
+        """
+        remove_dirs = []
+        for sketch in sketch_list:
+            if os.path.isdir(sketch):
+                # Get all the .ino files in the directory
+                sketch_dir = os.path.join(self.ci_config.asset_root_path, sketch)
+                if not os.path.exists(sketch_dir):
+                    logging.error(f"Sketch directory \"{sketch_dir}\" not found")
+                    sys.exit(1)
+                for root, dirs, files in os.walk(sketch_dir):
+                    for file in files:
+                        if file.endswith(".ino"):
+                            sketch_with_full_path = os.path.join(root, file)
+                            sketch_with_relative_path = os.path.relpath(sketch_with_full_path, self.ci_config.asset_root_path)
+                            sketch_list.append(sketch_with_relative_path)
+                # Add the directory to the remove list
+                remove_dirs.append(sketch)
+
+        # Remove the directories from the list
+        for sketch in remove_dirs:
+            sketch_list.remove(sketch)
+        
+        return sketch_list
+
+    def __get_sketch_file_list(self, fqbn, sketch=None):
+        """
+        Get the list of sketches for a given fqbn.
+        If a sketch is provided, then the list will contain only that sketch.
+
+        Args:
+            - fqbn (str): The fqbn to filter only its relevant sketches.
+            - sketch (str): The sketch to be compiled. If not provided,
+            the complete sketch list in the ci configuration matrix will
+            be compiled.
+        
+        Returns:
+            - sketch_list (list): A list of sketches to be compiled.
+        """
+        if sketch is None:
+            sketch_list = self.ci_config.get_list("sketch","fqbn=" + fqbn)
+            sketch_list = sketch_list["sketch"]
+        else:
+            sketch_list = [sketch]
+    
+        sketch_list = self.__get_sketch_file_list_no_dirs(sketch_list)
+
+        return sketch_list
+    
+    def __compile_sketch(self, fqbn, sketch, compile_report):
+        """
+        Compiles the sketch for the given fqbn.
+        The sketch is compiled using the "arduino-cli compile" command.
+        If the asset type is a library, the "--library" flag is added to the command.
+
+        Args:
+            - fqbn (str): The fqbn to be compiled.
+            - sketch (str): The sketch to be compiled.
+            - compile_report (CiCompileReport): The compile report object.
+        """
+        command = [
+            "arduino-cli",
+            "compile",
+            "--fqbn",
+            fqbn,
+            sketch,
+        ]
+
+        library_flags = ""
+        if self.ci_config.asset_type == "library":
+            library_flags = ["--library", "."]
+
+        if library_flags != "":
+            command.extend(library_flags)
+
+        CiCompileReport.print_sketch_compile_header(sketch)
+        compile_proc = subprocess.run(command, capture_output=True, text=True, check=False)
+
+        if compile_proc.returncode != 0:
+            CiCompileReport.print_fail_tag()
+            print(compile_proc.stderr)
+            compile_report.add_fail(sketch)
+        else:
+            CiCompileReport.print_pass_tag()
+            # TODO: Implement a proper logging system
+            # if args.verbose:
+            #     print(compile_proc.stdout)
+            compile_report.add_pass(sketch)
+
 
 class CiParser:
     """
@@ -640,7 +1272,7 @@ class CiParser:
         """
         # Get the script name without .py extension
         self.ci_tool_name = os.path.splitext(os.path.basename(__file__))[0]
-        self.ci_tool_version = "0.1.0"
+        self.ci_tool_version = "0.2.0"
         self.__create_parser()
 
         args = self.parser.parse_args(namespace=argparse.Namespace(ci_parser=self))
@@ -672,7 +1304,6 @@ class CiParser:
             args.ci_matrix_yml = os.path.join(args.root_path, "ci-matrix-config.yml")
 
         if args.verbose:
-            # Enable logging info
             logging.getLogger().setLevel(logging.INFO)
 
             print(f"Arduino asset root path:      {args.root_path}")
@@ -683,222 +1314,48 @@ class CiParser:
         return ci_config
     
     def __config_parser_func(self, args):
-
-        ci_config = self.__main_parser_func(args)
-
-        if args.list is not None:
-            queried_config = ci_config.get_list(args.list, args.filter)
-        else:
-            if args.filter is not None:
-                logging.error(f"The filter option is only available for the list command.")
-                sys.exit(1)
-            
-            queried_config = ci_config.config
-
-        # Print with desired format
-        if args.json_pretty:
-            print(json.dumps(queried_config, indent=4))  
-        elif args.yaml:
-            print(yaml.dump(queried_config, indent=4, default_flow_style=False))
-        else:
-            print(queried_config)
-
-    def __compile_parser_func(self, args):
-
-        def get_sketch_list(self, args, fqbn):
-            """
-            Get the list of sketches for a given fqbn.
-            If a sketch is not provided, then it will get the list
-            from the configuration matrix file.
-            """
-            if args.sketch is None:
-                ci_config = self.__main_parser_func(args)
-                sketch_list = ci_config.get_list("sketch","fqbn=" + fqbn)
-                sketch_list = sketch_list["sketch"]
+        """
+        Config parser function of arduino CI cli tool
+        """
+        def get_queried_config(ci_config, args):
+            if args.list is not None:
+                queried_config = ci_config.get_list(args.list, args.filter)
             else:
-                sketch_list = [args.sketch]
+                if args.filter is not None:
+                    logging.error(f"The filter option is only available for the list command.")
+                    sys.exit(1)
+                
+                queried_config = ci_config.config
         
-            # Iterate over the sketch list. If the 
-            # the sketch is not a .ino file, then it is a directory containing
-            # .ino files. Discover all the .ino files in the directory and 
-            # add them to the sketch list, and remove the directory from the list.
-            remove_dirs = []
-            for sketch in sketch_list:
-                if os.path.isdir(sketch):
-                    # Get all the .ino files in the directory
-                    sketch_dir = os.path.join(args.root_path, sketch)
-                    if not os.path.exists(sketch_dir):
-                        logging.error(f"Sketch directory \"{sketch_dir}\" not found")
-                        sys.exit(1)
-                    for root, dirs, files in os.walk(sketch_dir):
-                        for file in files:
-                            if file.endswith(".ino"):
-                                sketch_with_full_path = os.path.join(root, file)
-                                sketch_with_relative_path = os.path.relpath(sketch_with_full_path, args.root_path)
-                                sketch_list.append(sketch_with_relative_path)
-                    # Remove the directory from the list
-                    remove_dirs.append(sketch)
+            return queried_config
 
-            # Remove the directories from the list
-            for sketch in remove_dirs:
-                sketch_list.remove(sketch)
-
-            return sketch_list
-
-        def get_fqbn_list(self, args):
-            """
-            Get the list of fqbn for a given sketch.
-            If a fqbn is not provided, then it will get the list
-            from the configuration matrix file.
-            """
-            if args.fqbn is None:
-                ci_config = self.__main_parser_func(args)
-                fqbn_list = ci_config.get_list("fqbn")
-                fqbn_list = fqbn_list["fqbn"]
+        def print_config(queried_config, args):
+            if args.json_pretty:
+                print(json.dumps(queried_config, indent=4))  
+            elif args.yaml:
+                print(yaml.dump(queried_config, indent=4, default_flow_style=False))
             else:
-                fqbn_list = [args.fqbn]
+                print(queried_config)
 
-            return fqbn_list
-
-
-        compile_report = CiCompileReport()
-
-        fqbn_list = get_fqbn_list(self, args)
-
-        library_flags = ""
         ci_config = self.__main_parser_func(args)
-        if ci_config.asset_type == "library":
-            library_flags = ["--library", "."]
-
-        for fqbn in fqbn_list:
-            print("\n\033[94m--------------------------------------------------------")
-            print(f"--> fqbn: {fqbn}")
-            print("--------------------------------------------------------\033[0m")
-            sketch_list = get_sketch_list(self, args, fqbn)
-            for sketch in sketch_list:
-                command = [
-                    "arduino-cli",
-                    "compile",
-                    "--fqbn",
-                    fqbn,
-                    sketch,
-                ]
-                if library_flags != "":
-                    command.extend(library_flags)
-
-                print("\033[94m>> \033[0m", end="")
-                print(f"Compiling \"{sketch}\"", end="", flush=True)
-                compile_proc = subprocess.run(command, capture_output=True, text=True, check=False)
-
-                if compile_proc.returncode != 0:
-                    print("\033[91m [FAIL] \033[0m")
-                    print(compile_proc.stderr)
-                    compile_report.add_fail(sketch)
-                else:
-                    print("\033[92m [PASS] \033[0m")
-                    if args.verbose:
-                        print(compile_proc.stdout)
-                    compile_report.add_pass(sketch)
-
-            compile_report.summary()
-            if compile_report.get_fail_len() > 0:
-                sys.exit(1)
-
+        queried_config = get_queried_config(ci_config, args)
+        print_config(queried_config, args)
+        
+    def __compile_parser_func(self, args):
+        """
+        Compile parser function of arduino CI cli tool
+        """
+        ci_config = self.__main_parser_func(args)
+        ci_compiler = CiCompiler(ci_config)
+        ci_compiler.compile(args.fqbn, args.sketch)
 
     def __core_install_parser_func(self, args):
-
-        def get_fqbn_list(self, args):
-            """
-            Get the list of fqbn for a given sketch.
-            If a fqbn is not provided, then it will get the list
-            from the configuration matrix file.
-            """
-            if args.fqbn is None:
-                ci_config = self.__main_parser_func(args)
-                fqbn_list = ci_config.get_list("fqbn")
-                fqbn_list = fqbn_list["fqbn"]
-            else:
-                fqbn_list = [args.fqbn]
-
-            return fqbn_list
-
-        fqbn_list = get_fqbn_list(self, args)
-
-        def is_board_installed(fqbn):
-            command = [
-                "arduino-cli",
-                "board",
-                "listall",
-            ]
-            compile_proc = subprocess.run(command, capture_output=True, text=True, check=False)
-            # Check if the fqbn is in the list of installed boards
-            if fqbn in compile_proc.stdout:
-                return True
-
-            return False
-
-        def strip_core(fqbn):
-            # From the format <vendor>:<arch>:<board> get the vendor and arch
-            # and return the core name
-            return fqbn.split(":")[0] + ":" + fqbn.split(":")[1]
-
-        def is_third_party_core(core):
-
-            command = [
-                "arduino-cli",
-                "core",
-                "search",
-                core,
-            ]
-            compile_proc = subprocess.run(command, capture_output=True, text=True, check=False)
-
-            if "No platforms matching your search." in compile_proc.stdout:
-                return True
-
-            return False
-
-        def get_additional_url(config, core):
-
-            for url in config["additional_urls"]:
-                if url["core"] == core:
-                    return url["url"]
-            return None
-        
-        def install_core(fqbn):
-            # Get the core name from the fqbn
-            core = strip_core(fqbn)
-
-            additional_install_flags = []
-            if is_third_party_core(core):
-                ci_config = self.__main_parser_func(args)
-                additional_install_flags = ["--additional-urls", get_additional_url(ci_config.config, core)]
-                
-            command = [
-                "arduino-cli",
-                "core",
-                "install",
-                core
-            ]
-
-            if additional_install_flags != []:
-                command.extend(additional_install_flags)
-
-
-            compile_proc = subprocess.run(command, capture_output=True, text=True, check=False)
-            if compile_proc.returncode != 0:
-                print(compile_proc.stderr)
-            else:
-                if args.verbose:
-                    print(compile_proc.stdout)
-
-        for fqbn in fqbn_list:
-            print(f"Installing core for fqbn: {fqbn}")
-            if is_board_installed(fqbn):
-                print(f"Core for fqbn: {fqbn} is already installed")
-            else:   
-                install_core(fqbn)
-
-
+        """
+        Core install parser function of arduino CI cli tool
+        """
+        ci_config = self.__main_parser_func(args)
+        ci_core_installer = CiCoreInstaller(ci_config)
+        ci_core_installer.install(args.fqbn)
 
     def __create_parser(self):
         """
@@ -992,10 +1449,10 @@ class CiParser:
             help="Filter the list of elements based on a give the value of another key",
         )
 
-        # Add the config subparser
+        # Add the compile subparser
         compile_parser = subparsers.add_parser(
             "compile",
-            help="Compile the ci matrix sketches for a given fqbn",
+            help="Compile the ci matrix sketches for the fqbn matrix list or for a given fqbn",
         )
         compile_parser.set_defaults(func=self.__compile_parser_func)
         add_shared_args(compile_parser)
@@ -1016,10 +1473,10 @@ class CiParser:
             help="The sketch to be compiled",
         )
 
-        # Add the config subparser
+        # Add the core-install subparser
         core_install_parser = subparsers.add_parser(
             "core-install",
-            help="Install the core for a given fqbn",
+            help="Install the core for the fqbn matrix list or for a given fqbn",
         )
         core_install_parser.set_defaults(func=self.__core_install_parser_func)
         add_shared_args(core_install_parser)
@@ -1031,7 +1488,6 @@ class CiParser:
             default=None,
             help="The fqbn of the board to be installed",
         )
-
 
 
 if __name__ == "__main__":
