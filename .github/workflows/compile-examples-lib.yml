@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Infineon/arduino-devops
-          ref: compile-examples-lib
+          ref: latest
           path: arduino-devops
 
       - name: Set build matrix
@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Infineon/arduino-devops
-          ref: compile-examples-lib
+          ref: latest
           path: arduino-devops
           
       - name: Install arduino-cli
