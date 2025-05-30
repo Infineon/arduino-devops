@@ -7,6 +7,7 @@ import yaml
 import os
 import re
 import requests
+import semver
 import shutil
 import sys
 import subprocess
@@ -164,32 +165,6 @@ class PackageVersion:
         self.tag = self.__strip_prefix_from_version(git_tag)
         self.commit = git_sha
 
-    def check_consistency(self, platform_txt):
-        """
-        The version consistency check is done by comparing the git
-        versioning and the one in platform.txt.
-
-        These need to be matching in a definitive release.
-
-        Args:
-            - platform_txt: The path to the platform.txt file.
-        """
-
-        # Get the version from the platform.txt
-        with open(platform_txt, "r") as f:
-            lines = f.readlines()
-            for line in lines:
-                if "version=" in line:
-                    platform_version = line.split("=")[1].strip()
-                    break
-
-        # Check if the git tag is the same as the platform version
-        if self.tag != platform_version:
-            logging.error(
-                f"Git tag version {self.tag} does not match the platform version {platform_version}"
-            )
-            sys.exit(1)
-
     """ Private methods """
 
     def __strip_prefix_from_version(self, version):
@@ -338,20 +313,50 @@ class CorePackage:
 
     def __add_version(self, package_version):
         """
-        Creates a file with the version information and
-        add it to the package.
+        Adds the version information to the package in 
+        the platform.txt metadata file and as a separate file 
+        including the tag and commit sha.
 
         Args:
             - package_version: The package version object.
         """
-        version_file = os.path.join(self.pkg_path, ".version")
-        with open(version_file, "w") as f:
-            f.write(f"tag:    {package_version.tag}\n")
-            f.write(f"commit: {package_version.commit }\n")
+        def add_version_to_platform_txt():
+            """
+            Adds the version information to the platform.txt file.
 
-        logging.info(f"Added version information to package in {version_file}")
-        logging.info(f"  - tag:    {package_version.tag}")
-        logging.info(f"  - commit: {package_version.commit}")
+            The platform.txt contains a line with the variable "version="
+            Anything after the "=" will be replaced with the version information.
+
+            """
+            platform_txt = os.path.join(self.pkg_path, "platform.txt")
+
+            with open(platform_txt, "r") as f:
+                lines = f.readlines()
+
+            with open(platform_txt, "w") as f:
+                for line in lines:
+                    if "version=" in line:
+                        f.write(f"version={package_version.tag}\n")
+                    else:
+                        f.write(line)
+            logging.info(f"Added version information to platform.txt in {platform_txt}")
+
+        def add_version_file():
+            """
+            Creates a file with the version information and
+            add it to the package.
+            """
+            version_file = os.path.join(self.pkg_path, ".version")
+            with open(version_file, "w") as f:
+                f.write(f"tag:    {package_version.tag}\n")
+                f.write(f"commit: {package_version.commit }\n")
+
+            logging.info(f"Added version information to package in {version_file}")
+            logging.info(f"  - tag:    {package_version.tag}")
+            logging.info(f"  - commit: {package_version.commit}")
+
+        add_version_to_platform_txt()
+        add_version_file()
 
     def __zip(self):
         """
@@ -467,12 +472,60 @@ class PackageIndex:
     def __get_latest_release_package_index(self):
         """
         Gets the latest release package index from the server.
+        The latest is considered the previous release version.
+        This avoid conflicts when triggering the release directly
+        from the github release section.
 
         Supported servers:
             - Github
 
         Returns an empty index if the package index file does not exist.
         """
+        def get_previous_release_tag():
+            """
+            Get the previous release tag for the repository from the github server.
+            """
+            def get_repo_releases():
+                """
+                Get the list of releases from a the github repository.
+                The API returns a JSON with all information about the releases.
+                """
+                repo_owner = self.server["owner"]
+                repo_name = self.server["repo"]
+                request = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases"
+                response = requests.get(request)
+                if response.status_code != 200:
+                    logging.error(f"Could not retrieve the latest releases from github. Request error: {response.status_code}")
+                    sys.exit(1)
+                
+                # Iterate over the releases and get the one with the highest tag
+                releases = response.json()
+                return releases
+
+            def search_for_highest_tag(releases):
+                """
+                Search for the highest tag in the releases.
+                This will be the previous release.
+                """
+                tag_list = []
+                for release in releases:
+                    try:
+                        semver.VersionInfo.parse(release["tag_name"])
+                    except ValueError:
+                        logging.warning(f"Tag {release['tag_name']} is not a valid semver tag. Not considered for latest candidate.")
+                        continue
+                    tag_list.append(release["tag_name"])
+
+                tag_list.sort(key=semver.VersionInfo.parse, reverse=True)
+
+                return tag_list[0]
+        
+            releases = get_repo_releases()
+            return search_for_highest_tag(releases)
+        
+
+        previous_tag = get_previous_release_tag()
+
         # Create the url based on the server
         if self.server["type"] == "github":
             url = (
@@ -481,7 +534,9 @@ class PackageIndex:
                 + "/"
                 + str(self.server["repo"])
                 + "/"
-                + "releases/latest/download/"
+                + "releases/download/"
+                + str(previous_tag)
+                + "/"
                 + str(self.pckg_index_name)
                 + ".json"
             )
@@ -597,7 +652,6 @@ def build_release_assets(
     rel_conf_yml,
     core_root_path,
     pkg_build_path,
-    ver_check=True,
     inc_previous_releases=True,
 ):
     """
@@ -609,7 +663,6 @@ def build_release_assets(
         - rel_conf_yml: The path to the release configuration yml file.
         - core_root_path: The path to the arduino core root directory.
         - pkg_build_path: The path to build the package.
-        - ver_check: Assert that versions across core metafiles and git matches.
         - inc_previous_releases: Include previous releases in the package index.
     """
 
@@ -618,10 +671,6 @@ def build_release_assets(
 
     # Get the package version information
     package_version = PackageVersion()
-
-    # Validate the version consistency
-    if ver_check:
-        package_version.check_consistency(os.path.join(core_root_path, "platform.txt"))
 
     # Create the package directory
     core_package = CorePackage(
@@ -659,7 +708,7 @@ class PackageParser:
         """
         # Get the script name without .py extension
         self.package_tool_name = os.path.splitext(os.path.basename(__file__))[0]
-        self.package_tool_version = "0.1.0"
+        self.package_tool_version = "0.2.0"
         self.__create_parser()
 
         args = self.parser.parse_args(namespace=argparse.Namespace(package_parser=self))
@@ -709,7 +758,6 @@ class PackageParser:
             args.config_yml,
             args.root_path,
             args.build_path,
-            args.no_version_check,
             args.no_previous_releases,
         )
 
@@ -766,14 +814,6 @@ class PackageParser:
             type=str,
             default=None,
             help='Path to build the package. Default is the "build/" directory in the arduino core path',
-        )
-
-        # Argument for version check
-        self.parser.add_argument(
-            "--no-version-check",
-            action="store_false",
-            default=True,
-            help="Do not check the version consistency.",
         )
 
         # Argument for previous releases
