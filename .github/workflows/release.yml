@@ -1,53 +1,90 @@
 name: Release
 
 on:
-  release:
-    types: published
-  push:
-    tags: 
-      - '[0-9]+.[0-9]+.[0-9]+**'
   workflow_call:
     inputs:
-      release-title:
-        required: true
-        type: string
-        description: 'The title of the release'
       setup-script:
         required: false
         type: string
         default: null
         description: 'Any setup script to run before building the release assets'
+      version:
+        required: false
+        default: ''
+        type: string
+        description: 'Version to be used for the release. It can be a semver version or a bump type (major, minor, patch).'
 
 jobs:
-
-  core-package:
-    if: startsWith(github.ref, 'refs/tags/')
-    uses: Infineon/arduino-devops/.github/workflows/package-core.yml@latest
-    with:
-      setup-script: ${{ inputs.setup-script }}
-      release: true
-    secrets: inherit
-
   release:
-    needs: core-package
     runs-on: ubuntu-latest
-
-    if: startsWith(github.ref, 'refs/tags/')
     steps:
-    - name: Retrieve core package
-      uses: actions/download-artifact@v4
+      - name: Checkout repository 
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-tags: true
+          fetch-depth: 0
 
-    - name: Build release changelog
-      id: build_changelog
-      uses: mikepenz/release-changelog-builder-action@v3
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout arduino-devops
+        uses: actions/checkout@v4
+        with:
+          repository: Infineon/arduino-devops
+          ref: latest
+          path: arduino-devops
 
-    - name: Upload assets
-      uses: softprops/action-gh-release@v1
-      with:
-        name: ${{ inputs.release-title }} ${{  github.ref_name  }}
-        files: |
-          arduino-core-package/*.zip
-          arduino-core-package/*.json
-        body: ${{steps.build_changelog.outputs.changelog}}
+      - name: Install python dependencies
+        run: |
+            python -m pip install --upgrade pip
+            pip install -r arduino-devops/requirements.txt
+
+      - name: Auto tag release
+        if: ${{ inputs.version != '' }}
+        run: |
+          python ./arduino-devops/arduino-release.py new ${{ inputs.version }}
+
+      - name: Release verify
+        run: |
+          python ./arduino-devops/arduino-release.py verify
+
+      - name: Release info
+        id: release_info
+        run: |
+          head_tag=$(python ./arduino-devops/arduino-release.py info head-tag)
+          repo_name=$(python ./arduino-devops/arduino-release.py info repo-name)
+          asset_type=$(python ./arduino-devops/arduino-release.py info asset-type)
+          
+          echo "Repository name: $repo_name"
+          echo "Asset type: $asset_type"
+          echo "Head tag: $head_tag"
+          
+          echo "tag="$head_tag"" >> $GITHUB_OUTPUT
+          echo "repo_name="$repo_name"" >> $GITHUB_OUTPUT
+          echo "asset_type="$asset_type"" >> $GITHUB_OUTPUT
+      
+      - name: Release setup
+        if : ${{ inputs.setup-script }} != null
+        run: |
+          ${{ inputs.setup-script }}
+  
+      - name: Pack arduino core
+        if: ${{ steps.release_info.outputs.asset_type == 'core' }}
+        run: |
+          python ./arduino-devops/arduino-packager.py
+
+      - name: Build release changelog
+        id: build_changelog
+        uses: mikepenz/release-changelog-builder-action@v5
+        with:
+          mode: "HYBRID"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.release_info.outputs.repo_name }} ${{ steps.release_info.outputs.tag }}
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          files: |
+            build/*.zip
+            build/*.json
+          body: ${{steps.build_changelog.outputs.changelog}}
