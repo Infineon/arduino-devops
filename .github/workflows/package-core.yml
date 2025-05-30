@@ -49,7 +49,7 @@ jobs:
       - name: Set packager options
         run: |
           if [ "${{ inputs.release }}" = "false" ]; then
-            echo "packager_opts=--no-version-check --no-previous-releases" >> $GITHUB_ENV
+            echo "packager_opts=--no-previous-releases" >> $GITHUB_ENV
           else
             echo "packager_opts=" >> $GITHUB_ENV
           fi
