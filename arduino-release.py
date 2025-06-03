@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import requests
 import sys
 import semver
@@ -11,6 +12,9 @@ import time
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 
 class ReleaseLogger:
+    """
+    Logger class to enable formatted console output.
+    """
 
     def __init__(self):
         self.blue_on = "\033[94m"
@@ -30,21 +34,56 @@ class ReleaseLogger:
         print(f"{self.grey_on} [SKIP] {self.color_off}")
 
     def info_step(self, msg):
+        """
+        Prints an info message.
+        To be used before performing any operation which 
+        will later be completed with the result of the operation ok(), error() or skip().
+
+        Args:
+            msg: The message to be printed.
+        """
         print(f"{self.blue_on} -->{self.color_off} {msg}", end=" ")
         self.last_msg_ncol = len(msg) + len(" -->  ")
 
     def step_details(self, msg, highlighted="", end="\n"):
+        """
+        Prints extended details of the current operation.
+        This is just to indent that message below the info_step message.
+        Additionally, it can highlight a part of the message.
+
+        Args:
+            msg: The message to be printed.
+            highlighted: A second msg to be highlighted in the output.
+        """
         print(f"     {msg}{self.yellow_on}{highlighted}{self.color_off}", end=end)
     
     def del_line(self, time_s=0):
+        """ 
+        Deletes the last line printed in the console and moes the cursor back up.
+        If a delay is specified, it will wait for that time before deleting the line.
+
+        Args:
+            time_s: The time in seconds to wait before deleting the line. Default is 0.
+        """
         time.sleep(time_s)
         print("\033[F\033[K", end="")
 
     def cursor_back_up(self):
-        # Move cursor up n lines
+        """
+        Moves the cursor to the upper line and set the cursor and the end 
+        of the line of the last message printed by info_step.
+        """
         print(f"\033[F\033[{self.last_msg_ncol}G", end="")
     
     def color_msg(self, msg, color, end="\n"):
+        """
+        Prints a message in the specified color.
+
+        Args:
+            msg: The message to be printed.
+            color: The color to be used. It can be one of the following: "blue", "green", "red", "grey", "yellow".
+            end: The end character to be used. Default is newline.
+        """
         if color == "blue":
             print(f"{self.blue_on}{msg}{self.color_off}", end=end)
         elif color == "green":
@@ -59,7 +98,14 @@ class ReleaseLogger:
             print(msg, end=end)
 
     def wait_progress_animation(self, iterations):
-        # Every iteration will take 4 seconds
+        """
+        Prints a 3 dots animation in the console. Each iteration takes 4 seconds.
+        To be used for waiting for some operation to complete, and show the user 
+        that the operation is in progress.
+
+        Args:
+            iterations: The number of iterations to perform. Each iteration will take 4 seconds.
+        """
         for j in range(iterations):
             for i in range(3):
                 print(f"{self.yellow_on}.{self.color_off}", end="", flush=True)
@@ -68,10 +114,18 @@ class ReleaseLogger:
             time.sleep(1)
 
 class Release:
+    """
+    Class to manage the release of an Arduino asset (library or core).
+    """
 
     def __init__(self, root_path, any_branch=False):
         """
-        The constructor creates the argument parser and parses the arguments.
+        Constructor of the release class.
+
+        Args:
+            root_path: The path to the arduino asset (library or core) root directory.
+            any_branch: If True, the release can be created from any branch. Otherwise,
+                        the release can only be created from a permanent branch (main or master).
         """
         self.root_path = root_path
         self.any_branch = any_branch
@@ -81,9 +135,29 @@ class Release:
 
     def new(self, version):
         """
-        Create a new release if all the conditions are met.
+        Creates a new release for the specified version.
 
-        args:
+        This method performs the following checks:
+        - Asserts that the HEAD is in a permanent branch (main or master) unless `any_branch` is set to True.
+        - Asserts that all CI workflows are successful for the HEAD commit.
+        - Asserts that the HEAD is not already tagged.
+
+        If all checks pass, it performs the following actions:
+        - Gets the previous version from the git tags.
+        Then:
+        - Validates the new version if a numeric semver version is passed 
+        or
+        - Performs a version bump (major, minor, patch)
+
+        If the asset type is a library:
+        - Updates the `library.properties` file with the new version.
+        - Commits the changes to the `library.properties` file.
+
+        Then finally:
+        - Creates a new git tag with the new version.
+        - Pushes the new git tag to the remote repository.
+
+        Args:
             version: The new version to be set. It can be either a version number (semver x.y.z) or a version bump (major, minor, patch).
         """
 
@@ -98,53 +172,85 @@ class Release:
         else:
             new_version = self.__validate_new_numeric(current_version, version)
 
-        if self.__is_asset_library():
-            self.log.info_step("Updating library.properties file with new version: ")
+        if self.__get_asset_type() == "library":
             self.__update_lib_properties(new_version)
-            self.__git_commit_change(new_version, user, email)
+            self.__git_commit_change(new_version)
         
-        # check here if all works with pre-commit hooks, if we should do the push manually.
         self.__git_tag(new_version)
         self.__git_push_tag(new_version)
 
 
     def verify(self):
-        # all workflows are green for this commit/branch
+        """
+        Verifies all requirements are met for a new release.
+        
+        This method performs the following checks:
+        - Asserts that all CI workflows are successful for the HEAD commit.
+        - Validates that the new version is a valid semver increment compared to the previous version.
+        - If the asset type is a library, it asserts that the `library.properties` file has the
+          same version as the git tag.
+        """
         self.__assert_ci_workflows_success()
         current_tag = self.__get_head_tag()
         previous_tag = self.__get_previous_tag()
 
         self.__validate_new_numeric(previous_tag, current_tag)
         
-        if self.__is_asset_library():
-            pass # TODO: Next iteration. Current focus on core.
-            self.log.info_step("Checking library.properties file with new version: ")
+        if self.__get_asset_type() == "library":
+            self.__assert_lib_properties_version(current_tag)
 
     def info(self, key):
+        """
+        Prints the value of the repository information for the specified key.
+        The available keys are:
+            - "head-tag": The tag of the HEAD commit.
+            - "repo-name": The name of the repository (owner/name).
+            - "asset-type": The type of the asset (library or core).
+
+        Args:
+            key: The key for which the value should be printed. It can be either "head-tag", "repo-name" or "asset-type".
+        """
         if key == "head-tag":
             print(self.__get_head_tag(log=False))
         elif key == "repo-name":
             print(self.__get_repo_owner_name()[1])
         elif key == "asset-type":
-            # TODO: Implement a proper check for asset type
-            print("library" if self.__is_asset_library() else "core")
+            print(self.__get_asset_type())
         else:
             print("Key not recognized. Available keys are: 'head-tag', 'repo-name', 'asset-type'.")
             sys.exit(1)
 
+    """ Private methods """
+
     def __validate_new_numeric(self, previous_version, version_bump):
-        # Check if the version is a valid semver version
-        # Check if it is valid increase compared to the previous version
-        try:
-            new_version = semver.VersionInfo.parse(version_bump)
-            previous_version = semver.VersionInfo.parse(previous_version)
-        except ValueError:
-            self.log.error()
-            self.log.step_details("The chosen version is not a valid semver format: ", version_bump)
-            sys.exit(1)
-        
+        """
+        Checks if the new version is a valid semver version and if it is a valid increment
+        compared to the previous version.
+        Args:
+            previous_version: The previous version to compare with.
+            version_bump: The new version to validate. It can be either a version number (semver x.y.z) or a version bump (major, minor, patch).
+
+        Returns:
+            The new version as a semver.VersionInfo object if it is a valid increment.
+            Otherwise, it exits the program with an error message.
+        """
+
         def is_valid_increase(new_version, previous_version):
-            #The new version should be greater than the previous version and a valid
+            """
+            Check if the new version is a valid semver increment compared to the previous version.
+            A valid increment fulfills the following conditions:
+            - If the major version is increased, the minor and patch versions should be 0.
+            - If the minor version is increased, the patch version should be 0.
+            - If the patch version is increased, the minor version should be the same.
+            - Any of the numbers can be only increased by 1.
+
+            Args:
+                new_version: The new version to validate.
+                previous_version: The previous version to compare with.
+            Returns:
+                True if the new version is a valid semver increment.
+                False otherwise.
+            """
             if new_version.major > previous_version.major:
                 return new_version.major == previous_version.major + 1 and new_version.minor == 0 and new_version.patch == 0
             elif new_version.minor > previous_version.minor:
@@ -154,7 +260,20 @@ class Release:
             return False
         
         def is_valid_from_release_candidate(new_version, previous_version):
-            # The new version should be greater than the previous version and a valid
+            """
+            Check if the new version is a valid semver increment from a release candidate.
+            A valid increment from a release candidate fulfills the following conditions:
+            - If the previous version is a prerelease (release candidate), the new version can be a normal release.
+            - The major, minor and patch versions should be the same as the previous version.
+            - The prerelease version should be different from the previous version.
+
+            Args:
+                new_version: The new version to validate.
+                previous_version: The previous version to compare with.
+            Returns:
+                True if the new version is a valid semver increment from a release candidate.
+                False otherwise.
+            """
             if previous_version.prerelease and \
                 new_version.major == previous_version.major and \
                 new_version.minor == previous_version.minor and \
@@ -163,6 +282,18 @@ class Release:
                 return True
             return False
 
+        # Allow for vV prefix in the version. 
+        # This is added to support legacy tags versioning used in some Arduino libraries.
+        previous_version = self.__strip_prefix_from_version(previous_version)
+
+        try:
+            new_version = semver.VersionInfo.parse(version_bump)
+            previous_version = semver.VersionInfo.parse(previous_version)
+        except ValueError:
+            self.log.error()
+            self.log.step_details("The chosen version is not a valid semver format: ", version_bump)
+            sys.exit(1)
+        
         self.log.info_step("Validating new version")
         self.log.color_msg(new_version, "yellow", end="") 
         self.log.color_msg(" ...", "none", end="") 
@@ -177,8 +308,20 @@ class Release:
         return new_version
 
     def __new_bump(self, previous_version, version_bump):
-        
+        """
+        Bumps the previous version according to the specified version bump type (major, minor, patch).
+
+        Args:
+            previous_version: The previous version to bump.
+            version_bump: The type of version bump to perform. It can be either "major", "minor" or "patch".
+        Returns:
+            The new version as a semver.VersionInfo object.
+        """
         self.log.info_step("New bumped version :")
+
+        # Allow for vV prefix in the version. 
+        # This is added to support legacy tags versioning used in some Arduino libraries.
+        previous_version = self.__strip_prefix_from_version(previous_version)
 
         new_version = semver.VersionInfo.parse(previous_version)
         if version_bump == "major":
@@ -192,9 +335,23 @@ class Release:
 
         return new_version
 
+    def __strip_prefix_from_version(self, version):
+        """
+        Strips 'v' or 'V' prefix from version.
+
+        Args:
+            version: The version string to be stripped.
+        Returns:
+            The version string without the 'v' or 'V' prefix.
+        """
+        return re.sub(r"[vV]", "", version)
+
     def __assert_permanent_branch(self):
         """
-        Check if the repo HEAD is in a permanent branch (main or master).
+        Asserts if the repo HEAD is in a permanent branch (main or master).
+        If the HEAD is not in a permanent branch, it exits the program with an error message.
+
+        If the `any_branch` flag is set to True, it skips this check
         """
         
         self.log.info_step("Checking if repo HEAD in the default branch...")
@@ -215,10 +372,27 @@ class Release:
     
     def __assert_ci_workflows_success(self):
         """
-        Check if all the workflows are green for the latest commit in the main branch.
+        Asserts if all the Github Actions workflows are successful for the HEAD commit.
+        If any workflow fails, it exits the program with an error message.
+
+        The method performs the following steps:
+        - Retrieves the workflows for the HEAD commit using the GitHub API.
+        - Wait for all workflows to complete if they are still in progress.
+        - Asserts that all workflows are successful.
         """
 
         def get_workflow_runs(repo_owner, repo_name, branch, commit_hash):
+            """
+            Retrieves the GitHub Action workflow runs for the specified repository, branch and commit.
+
+            Args:
+                - repo_owner: The owner of the repository.
+                - repo_name: The name of the repository.
+                - branch: The branch to check the workflows for.
+                - commit_hash: The commit hash to check the workflows for.
+            Returns:
+                A list of workflow runs for the specified repository, branch and commit.
+            """
             request = f"https://api.github.com/repos/{repo_owner}/{repo_name}/actions/runs?branch={branch}&head_sha={commit_hash}" 
             response = requests.get(request)
             if response.status_code != 200:
@@ -230,6 +404,17 @@ class Release:
             return response.json().get("workflow_runs", [])
 
         def assert_workflow_runs_status(workflows):
+            """
+            Asserts that all workflows are successful.
+            If any workflow fails, it exits the program with an error message.
+
+            The key "conclusion" in the workflow run indicates the final status of the workflow.
+            The workflow is skipped if the workflow name contains "release" (case insensitive),
+            as this would be the current workflow being executed.
+
+            Args:
+                - workflows: A list of workflow runs to check the status for.
+            """
             print()
             for wflow in workflows:
                 self.log.step_details(wflow["name"], end=" ")
@@ -249,6 +434,19 @@ class Release:
         def assert_workflows_completion(workflows):
             """
             Assert that all workflows are completed.
+
+            The key "status" in the workflow run indicates the current status of the workflow.
+            The workflow is considered in progress if the status is "in_progress" or "requested".
+
+            The workflow is skipped if the workflow name contains "release" (case insensitive),
+            as this would be the current workflow being executed.
+
+            Args:
+                - workflows: A list of workflow runs to check the status for.
+
+            Returns:
+                True if all workflows are completed, False otherwise.
+                If any workflow is in progress, it prints the name of the workflow and returns False.
             """
             for wflow in workflows:
                 if wflow["status"] == "in_progress" or wflow["status"] == "requested":
@@ -287,9 +485,24 @@ class Release:
 
 
     def __get_head_branch(self):
+        """
+        Gets the current branch of the HEAD commit.
+        Returns:
+            The name of the current branch.
+        """
         return os.popen(f"git -C {self.root_path} rev-parse --abbrev-ref HEAD").read().strip()
 
     def __get_repo_owner_name(self):
+        """
+        Gets the owner and name of the repository from the remote URL.
+
+        It uses the `git config --get remote.origin.url` command to retrieve the remote URL.   
+        The remote URL can be either in HTTPS or SSH format.
+
+        Returns:
+            A tuple containing the owner and name of the repository.
+            If the remote URL is not recognized, it exits the program with an error message.
+        """
         remote = os.popen(f"git -C {self.root_path} config --get remote.origin.url").read().strip()
         gh_https_url = "https://github.com/"
         gh_ssh_url = "git@github.com:"
@@ -319,7 +532,8 @@ class Release:
 
     def __assert_head_not_tagged(self):
         """
-        Check if the HEAD is tagged.
+        Asserts that the HEAD commit is not already tagged.
+        If the HEAD commit is already tagged, it exits the program with an error message.
         """
         self.log.info_step("Checking if HEAD is not already tagged...")
 
@@ -335,7 +549,10 @@ class Release:
 
     def __get_latest_version(self):
         """
-        Get the last version from the git tags.
+        Gets the lastest version from the git tags.
+
+        Returns:
+            The last version as a string. If no tags are found, it returns "0.0.0".
         """
         self.log.info_step("Previous last version :")
         command = ["git", "-C", self.root_path, "describe", "--tags", "--abbrev=0"]
@@ -353,7 +570,13 @@ class Release:
 
     def __get_head_tag(self, log=True):
         """
-        Get the tag of the HEAD commit.
+        Gets the tag of the HEAD commit.
+        If the HEAD commit is not tagged, it exits the program with an error message.
+
+        Args:
+            log: If True, it logs the information. Default is True.
+        Returns:
+            The tag of the HEAD commit as a string.
         """
         if log:
             self.log.info_step("HEAD tag :")
@@ -375,7 +598,11 @@ class Release:
 
     def __get_previous_tag(self):
         """
-        Get the previous tag from the git tags.
+        Gets the previous tag from the git tags.
+        If no previous tag is found, it returns "0.0.0" and logs a message.
+
+        Returns:
+            The previous tag as a string. If no previous tag is found, it returns "0.0.0".
         """
         self.log.info_step("Previous tag :")
         command = ["git", "-C", self.root_path, "describe", "--tags", "--abbrev=0", "HEAD^"]
@@ -391,29 +618,107 @@ class Release:
 
         return previous_tag
 
-    def __is_asset_library(self):
-        """
-        Checks if the asset is an Arduino library. 
-        If that is the case, it should contain a library.properties file.
-        """
-        if os.path.exists(os.path.join(self.root_path, "library.properties")):
-            return True
-
-        return False
-
     def __update_lib_properties(self, new_version):
-        pass
-        # TODO: Next iteration. Current focus on core.
+        """
+        Updates the `library.properties` file with the new version.
 
-    def __git_commit_change(self, new_version, user, email):
-        pass
-        # TODO: Next iteration. Current focus on core.
-    
+        Args:
+            new_version: The new version to be set in the `library.properties` file.
+        """
+        self.log.info_step("Updating \"library.properties\" file with new version...")
+
+        properties_file = os.path.join(self.root_path, "library.properties")
+        with open(properties_file, "r") as f:
+            lines = f.readlines()
+
+        with open(properties_file, "w") as f:
+            for line in lines:
+                if line.startswith("version="):
+                    f.write(f"version={new_version}\n")
+                else:
+                    f.write(line)
+        self.log.ok()
+        
+
+    def __git_commit_change(self, new_version):
+        """
+        Commits the changes to the `library.properties` file with the new version.
+
+        It checks if the git user is set, and if not, it sets the git user to a default value.
+        The default git user is set to 'github-actions[bot]' with a noreply email.
+
+        Args:
+            new_version: The new version to be set in the commit message.
+        """
+        def is_git_user_set():
+            """
+            Checks if the git user is set.
+            """
+            param = "user.name"
+            git_cmd = ["git", "-C", self.root_path, "config", "--get", param]
+            git_proc_name = subprocess.run(git_cmd, capture_output=True, text=True, check=False)
+
+            param = "user.email"
+            git_proc_email = subprocess.run(git_cmd, capture_output=True, text=True, check=False)   
+            
+            return git_proc_name.stdout.strip() != "" and git_proc_email.stdout.strip() != "" 
+
+        def set_git_user(user, email):
+            """
+            Sets the git user and email to the specified values.
+
+            Args:
+                user: The git user name to be set.
+                email: The git user email to be set.
+            """
+            self.log.info_step("Setting git user and email...")
+            command = ["git", "-C", self.root_path, "config", "--local", "user.name", user]
+            git_proc_user = subprocess.run(command, capture_output=True, text=True, check=False)
+            
+            if git_proc_user.returncode != 0:
+                self.log.error()
+                self.log.step_details("Error setting git user: ", git_proc_user.stderr.strip())
+                sys.exit(1)
+
+            command = ["git", "-C", self.root_path, "config", "--local", "user.email", email]
+            git_proc_email = subprocess.run(command, capture_output=True, text=True, check=False)
+            
+            if git_proc_email.returncode != 0:
+                self.log.error()
+                self.log.step_details("Error setting git email: ", git_proc_email.stderr.strip())
+                sys.exit(1)
+
+            self.log.ok()
+
+        
+        if not is_git_user_set():
+            set_git_user('github-actions[bot]', 'github-actions[bot]@users.noreply.github.com')
+        
+        self.log.info_step("Committing changes to library.properties file...")
+        command = ["git", "-C", self.root_path, "add", "library.properties"]
+        git_proc_add = subprocess.run(command, capture_output=True, text=True, check=False)
+        if git_proc_add.returncode != 0:
+            self.log.error()
+            self.log.step_details("Error adding library.properties file: ", git_proc_add.stderr.strip())
+            sys.exit(1)
+        
+        command = ["git", "-C", self.root_path, "commit", "-s", "-m", f"library.properties: Bumped version to {new_version}."]
+        git_proc_commit = subprocess.run(command, capture_output=True, text=True, check=False)
+        if git_proc_commit.returncode != 0:
+            self.log.error()
+            self.log.step_details("Error committing library.properties file: ", git_proc_commit.stderr.strip())
+            sys.exit(1)
+        
+        self.log.ok()
+
     def __git_tag(self, new_version):
         """
-        Create a new git tag with the new version.
+        Creates a new git tag with the new version.
+
+        Args:
+            new_version: The new version to be set as a git tag.
         """
-        self.log.info_step("Creating new git tag... ")
+        self.log.info_step("Creating new git tag...")
         command = ["git", "-C", self.root_path, "tag", str(new_version)]
         git_proc = subprocess.run(command, capture_output=True, text=True, check=False)
         
@@ -426,10 +731,14 @@ class Release:
 
     def __git_push_tag(self, new_version):
         """
-        Push the new git tag to the remote repository.
+        Pushes the new git tag to the remote repository.
+
+        Args:
+            new_version: The new version to be pushed as a git tag.
         """
-        self.log.info_step("Pushing new git tag... ")
-        command = ["git", "push", "origin", str(new_version)]
+        self.log.info_step("Pushing new git tag...")
+        branch = self.__get_head_branch()
+        command = ["git", "push", "origin", branch, str(new_version)]
         git_proc = subprocess.run(command, capture_output=True, text=True, check=False)
         
         if git_proc.returncode != 0:
@@ -439,14 +748,67 @@ class Release:
         
         self.log.ok()
 
+    def __assert_lib_properties_version(self, current_tag):
+        """
+        Asserts that the library.properties file has the correct version.
+
+        Args:
+            current_tag: The current tag of the HEAD commit. This should match the version in the library.properties file.
+        """
+        self.log.info_step("Validating \"library.properties\" version field...")
+        properties_file = os.path.join(self.root_path, "library.properties")
+        with open(properties_file, "r") as f:
+            lines = f.readlines()
+
+        for line in lines:
+            if line.startswith("version="):
+                version = line.split("=")[1].strip()
+                if version != current_tag:
+                    self.log.error()
+                    self.log.step_details("New version does not match \"library.properties\" version field : ", version)
+                    sys.exit(1)
+                else:
+                    self.log.ok()
+                return
+        
+        self.log.error()
+        self.log.step_details("\"library.properties\" file does not contain a version field.")
+        sys.exit(1)
+
+    def __get_asset_type(self):
+        """
+        Gets the asset type based on the root path content.
+        The asset type can be either a library or a core.
+            - A library is considered when the "library.properties" file is present in the asset root path.
+            - A core is considered when the "platform.txt" and "board.txt" files and
+            the "cores" and "variants" directories are present in the asset root path.
+        
+        Returns:
+            The asset type as a string. It can be either "library" or "core".
+        """
+        if os.path.exists(os.path.join(self.root_path, "library.properties")):
+            return "library"
+        elif os.path.exists(os.path.join(self.root_path, "platform.txt")) and \
+             os.path.exists(os.path.join(self.root_path, "boards.txt")) and \
+             os.path.exists(os.path.join(self.root_path, "variants")) and \
+             os.path.exists(os.path.join(self.root_path, "cores")):
+            return "core"
+        else:
+            logging.error(f"Asset type not found. The asset root path \"{self.root_path}\" does not contain a valid library or core.")
+            sys.exit(1) 
+
+
 class ReleaseParser:
+    """
+    Class that parses the release tool arguments
+    """
 
     def __init__(self):
         """
         The constructor creates the argument parser and parses the arguments.
         """
         self.release_tool_name = os.path.splitext(os.path.basename(__file__))[0]
-        self.release_tool_version = "0.1.0"
+        self.release_tool_version = "0.2.0"
         self.__create_parser()
 
         args = self.parser.parse_args(namespace=argparse.Namespace(release_parser=self))
@@ -474,7 +836,7 @@ class ReleaseParser:
         """
         Main parser function of arduino release tool.
         """
-        print("main parser function")
+        self.parser.print_help()
 
     def __new_version_parser_func(self, args):
         """
