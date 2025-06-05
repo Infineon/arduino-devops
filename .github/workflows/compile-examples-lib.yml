@@ -51,9 +51,10 @@ jobs:
         run: |
           python ./arduino-devops/arduino-cli-install.py 1.2.0
 
-      - name: Install fqbn core
+      - name: Install library dependencies
         run: |
           python ./arduino-devops/arduino-ci.py core-install --fqbn ${{ matrix.fqbn }}
+          python ./arduino-devops/arduino-ci.py lib-deps-install
 
       - name: Compile examples
         run: |
