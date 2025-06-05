@@ -1272,7 +1272,7 @@ class CiParser:
         """
         # Get the script name without .py extension
         self.ci_tool_name = os.path.splitext(os.path.basename(__file__))[0]
-        self.ci_tool_version = "0.2.0"
+        self.ci_tool_version = "0.3.0"
         self.__create_parser()
 
         args = self.parser.parse_args(namespace=argparse.Namespace(ci_parser=self))
@@ -1299,6 +1299,15 @@ class CiParser:
     def __main_parser_func(self, args):
         """
         Main parser function of arduino CI cli tool
+        """
+        self.parser.print_help()
+
+    def __get_ci_config(self, args):
+        """
+        Get ci configuration instance
+        If no configuration file is provided,
+        it will use the default configuration file
+        in the root path of the asset.
         """
         if args.ci_matrix_yml is None:
             args.ci_matrix_yml = os.path.join(args.root_path, "ci-matrix-config.yml")
@@ -1337,7 +1346,7 @@ class CiParser:
             else:
                 print(queried_config)
 
-        ci_config = self.__main_parser_func(args)
+        ci_config = self.__get_ci_config(args)
         queried_config = get_queried_config(ci_config, args)
         print_config(queried_config, args)
         
@@ -1345,7 +1354,7 @@ class CiParser:
         """
         Compile parser function of arduino CI cli tool
         """
-        ci_config = self.__main_parser_func(args)
+        ci_config = self.__get_ci_config(args)
         ci_compiler = CiCompiler(ci_config)
         ci_compiler.compile(args.fqbn, args.sketch)
 
@@ -1353,7 +1362,7 @@ class CiParser:
         """
         Core install parser function of arduino CI cli tool
         """
-        ci_config = self.__main_parser_func(args)
+        ci_config = self.__get_ci_config(args)
         ci_core_installer = CiCoreInstaller(ci_config)
         ci_core_installer.install(args.fqbn)
 
