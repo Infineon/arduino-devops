@@ -743,6 +743,10 @@ class CiMatrixConfig:
         """
         queried_list = { query_key: [] }
 
+        exclude_filter_values = self.__get_values_from_modifier_node_key("exclude", filter_key, single_key_check=True)
+        if filter_value in exclude_filter_values:
+            return queried_list
+
         root_node_key_values = self.__get_values_from_root_node_key(filter_key)
         include_filter_values = self.__get_values_from_modifier_node_key("include", filter_key, single_key_check=True)
         if filter_value in root_node_key_values or filter_value in include_filter_values:   
