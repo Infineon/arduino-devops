@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import sys
 import subprocess
 import yaml
@@ -987,6 +988,129 @@ class CiCoreInstaller():
         return False
         
 
+class LibDepsInstaller():
+    """
+    This class is used to install the library dependencies for the sketches.
+    The library dependencies are installed using the "arduino-cli lib install" command.
+    """
+
+    def __init__(self, asset_root_path):
+        """
+        Creates the LibDepsInstaller object.
+
+        Args:
+            - asset_root_path (str): The root path of the asset.
+            This is used to find the library dependencies for the sketches.
+        """
+        self.asset_root_path = asset_root_path
+
+    def install(self):
+        """
+        Installs the library dependencies for a library asset.
+        It inspect the directory for the "library.properties" file,
+        and install them using the "arduino-cli lib install" command.
+        """
+
+        print("Installing library dependencies...")
+        lib_deps = self.__get_lib_deps()
+        if lib_deps:
+            print(f"Found \"{lib_deps}\" library dependencies to install.")
+        else:
+            print("No library dependencies found.")
+            return
+
+        self.__install_lib(lib_deps)
+
+        print("Library dependencies installed successfully.")
+
+    """ Private methods """
+
+    def __get_lib_deps(self):
+        """
+        Gets the library dependencies from the library.properties file.
+
+        The file contains a "depends" key with a comma separated list of libraries.
+        If the key is empty, it will return an empty list.
+        """
+        lib_properties_file = os.path.join(self.asset_root_path, "library.properties")
+        with open(lib_properties_file, "r") as f:
+            lib_properties_content = f.read()
+
+        # Parse the content of the library.properties file and get the "depends" key
+        for line in lib_properties_content.splitlines():
+            if line.startswith("depends="):
+                # The value of the "depends" key is a comma separated list of libraries
+                # Remove the "depends=" prefix from the line
+                line = line.replace("depends=", "")
+                libs = line.strip().split(",")
+                return [lib.strip() for lib in libs if lib.strip() != ""]
+
+    @staticmethod
+    def __install_lib(libs):
+        """
+        Installs each of the library of the list passed by argument.
+
+        The library is installed using the "arduino-cli lib install" command.
+
+        Args:
+            - libs (list): A list of libraries to be installed.
+              The library can as well include the version constrains in the format
+              "library (version)"
+        """
+        def format_lib_arg(lib):
+            """
+            Formats the library to be used as an argument for the "arduino-cli lib install" command
+            in the format:
+            "library@version" if the version is specified,
+            or just:
+            "library" if no version is specified.
+
+            Check the version constrains formats allowed in library.properties file:
+            # https://docs.arduino.cc/arduino-cli/library-specification/#version-constraints
+
+            This tool right now only supports constrains which explicitly provide a version.
+            Meaning those containing an (at least) equal: >=, <=, =.
+            Constrains requiring the discovery of greater, lower or range versions are not (currently) supported.
+            """
+            # If the lib has a version in parenthesis,
+            # the output format will become library@version
+            if "(" in lib and ")" in lib:
+                lib_name = lib.split("(")[0].strip()
+
+                lib_version = lib.split("(")[1].split(")")[0].strip()
+                # Only equal versions will be considered.  No discovery of > or < version will be here implemented.
+                if "<=" in lib_version or ">=" in lib_version or "=" in lib_version:
+                    lib_version = lib_version.replace("<=", "").replace(">=", "").replace("=", "").strip()
+
+                # Check if this is valid semver version x.y.z. This discard any other not supported constrain.
+                if not re.match(r"^\d+\.\d+\.\d+$", lib_version):
+                    logging.error(f"Invalid version format for library \"{lib_name}\" : {lib_version}. \n \
+                    \rOnly versions constrains \"=, <=, >=\" are implemented.\n \
+                    \rNo discovery of greater, lower or range versions in this tool.")
+                    sys.exit(1)
+
+                return f"{lib_name}@{lib_version}"
+            else:
+                return f"{lib}"
+
+
+        for lib in libs:
+            lib_arg = format_lib_arg(lib)
+            command = [
+                "arduino-cli",
+                "lib",
+                "install",
+                lib_arg,
+            ]
+
+            lib_install_proc = subprocess.run(command, capture_output=True, text=True, check=False)
+
+            if lib_install_proc.returncode != 0:
+                logging.error(f"Error installing library \"{lib_arg}\"")
+                print(lib_install_proc.stderr)
+
+            print(f"Library \"{lib_arg}\" installed successfully.")
+
 class CiCompileReport:
     """
     Class that generates the compile report for the compile sketches.
@@ -1370,6 +1494,13 @@ class CiParser:
         ci_core_installer = CiCoreInstaller(ci_config)
         ci_core_installer.install(args.fqbn)
 
+    def __lib_deps_install_parser_func(self, args):
+        """
+        Library deps install parser function of arduino CI cli tool
+        """
+        lib_deps_installer = LibDepsInstaller(args.root_path)
+        lib_deps_installer.install()
+
     def __create_parser(self):
         """
         Creates the argument parser for the build CI matrix script.
@@ -1501,6 +1632,14 @@ class CiParser:
             default=None,
             help="The fqbn of the board to be installed",
         )
+
+        # Add the lib-deps-install subparser
+        lib_deps_install_parser = subparsers.add_parser(
+            "lib-deps-install",
+            help="Install the \"depends\" libraries in the  \"library.properties\" file of the library asset",
+        )
+        lib_deps_install_parser.set_defaults(func=self.__lib_deps_install_parser_func)
+        add_shared_args(lib_deps_install_parser)
 
 
 if __name__ == "__main__":
