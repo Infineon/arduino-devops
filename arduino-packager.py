@@ -518,6 +518,10 @@ class PackageIndex:
 
                 tag_list.sort(key=semver.VersionInfo.parse, reverse=True)
 
+                if not tag_list:
+                    logging.warning("No release found in the repository. Using previous tag as '0.0.0'")
+                    return "0.0.0"
+
                 return tag_list[0]
         
             releases = get_repo_releases()
