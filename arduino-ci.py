@@ -484,6 +484,8 @@ class CiMatrixConfig:
                             # to avoid absolute path in the sketch list
                             sketch_with_full_path = os.path.join(root, file)
                             sketch_with_relative_path = os.path.relpath(sketch_with_full_path, self.asset_root_path)
+                            # Exchange backslash with forward slash (in case of Windows)
+                            sketch_with_relative_path = sketch_with_relative_path.replace("\\", "/")
                             sketch_list.append(sketch_with_relative_path)
         
             return sketch_list
@@ -1054,7 +1056,7 @@ class LibDepsInstaller():
 
         Args:
             - libs (list): A list of libraries to be installed.
-              The library can as well include the version constrains in the format
+              The library can as well include the version constraints in the format
               "library (version)"
         """
         def format_lib_arg(lib):
@@ -1065,12 +1067,12 @@ class LibDepsInstaller():
             or just:
             "library" if no version is specified.
 
-            Check the version constrains formats allowed in library.properties file:
+            Check the version constraints formats allowed in library.properties file:
             # https://docs.arduino.cc/arduino-cli/library-specification/#version-constraints
 
-            This tool right now only supports constrains which explicitly provide a version.
+            This tool right now only supports constraints which explicitly provide a version.
             Meaning those containing an (at least) equal: >=, <=, =.
-            Constrains requiring the discovery of greater, lower or range versions are not (currently) supported.
+            Constraints requiring the discovery of greater, lower or range versions are not (currently) supported.
             """
             # If the lib has a version in parenthesis,
             # the output format will become library@version
@@ -1085,7 +1087,7 @@ class LibDepsInstaller():
                 # Check if this is valid semver version x.y.z. This discard any other not supported constrain.
                 if not re.match(r"^\d+\.\d+\.\d+$", lib_version):
                     logging.error(f"Invalid version format for library \"{lib_name}\" : {lib_version}. \n \
-                    \rOnly versions constrains \"=, <=, >=\" are implemented.\n \
+                    \rOnly versions constraints \"=, <=, >=\" are implemented.\n \
                     \rNo discovery of greater, lower or range versions in this tool.")
                     sys.exit(1)
 
@@ -1108,6 +1110,7 @@ class LibDepsInstaller():
             if lib_install_proc.returncode != 0:
                 logging.error(f"Error installing library \"{lib_arg}\"")
                 print(lib_install_proc.stderr)
+                sys.exit(1)
 
             print(f"Library \"{lib_arg}\" installed successfully.")
 
