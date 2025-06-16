@@ -5,29 +5,25 @@ on:
   pull_request:
   workflow_call:
     inputs:
-      core-setup-script:
-        required: false
-        type: string
-        default: null
-        description: 'Any setup script to run before building the Arduino package'
       ci-setup-script:
         required: false
         type: string
         default: null
         description: 'Any setup script to run before compiling the examples'
-      os-list:
+      core-setup-script:
         required: false
         type: string
-        default: 'ubuntu-latest, windows-latest, macos-latest'
-        description: 'The list of operating systems to run the job on. The list should be a comma-separated string, e.g. "ubuntu-latest,windows-latest,macos-latest"'
+        default: null
+        description: 'Any setup script to run before building the Arduino core package'
+      os:
+        required: false
+        type: string
+        default: null
+        description: | 
+          'The operating system to use for the CI jobs. Default is "ubuntu-latest" for libraries
+          and "ubuntu-latest", "windows-latest", and "macos-latest" for cores.'
 
-jobs:
-  package-core: 
-    uses: Infineon/arduino-devops/.github/workflows/package-core.yml@latest
-    with:
-      setup-script: ${{ inputs.core-setup-script }}
-      release: false
-
+jobs:  
   ci-setup:
     runs-on: ubuntu-latest
     outputs:
@@ -36,6 +32,10 @@ jobs:
     steps:
       - name: Checkout repository 
         uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-tags: true
+          fetch-depth: 0
 
       - name: Checkout arduino-devops 
         uses: actions/checkout@v4
@@ -44,45 +44,113 @@ jobs:
           ref: latest
           path: arduino-devops
 
+      - name: Install python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r arduino-devops/requirements.txt
+
+      - name: Asset info
+        id: asset_info
+        run: |
+          asset_type=$(python ./arduino-devops/arduino-release.py info asset-type)
+          echo "asset_type="$asset_type"" >> $GITHUB_OUTPUT
+
       - name: Set build matrix
         id: set-matrix
         run: |
-          matrix_ci=$(python ./arduino-devops/arduino-ci.py config --list fqbn)
-          echo $matrix_ci
-          echo "matrix="$matrix_ci"" >> $GITHUB_OUTPUT
+          matrix_fqbn=$(python ./arduino-devops/arduino-ci.py config --list fqbn)
+          
+          if [[ -n "${{ inputs.os }}" ]]; then
+            matrix_os='"os": ["${{ inputs.os }}"]'
+          else
+            if [ "${{ steps.asset_info.outputs.asset_type }}" = "core" ]; then
+              matrix_os='"os": ["ubuntu-latest", "windows-latest", "macos-latest"]'
+            elif [ "${{ steps.asset_info.outputs.asset_type }}" = "library" ]; then
+              matrix_os='"os": ["ubuntu-latest"]'
+            fi
+          fi
 
-  compile-examples-ubuntu:
-    name: ubuntu
-    if: contains(inputs.os-list, 'ubuntu')
-    needs: 
-      - ci-setup
-      - package-core
-    uses : Infineon/arduino-devops/.github/workflows/compile-examples-os.yml@latest
-    with:
-      ci-matrix-json: ${{ needs.ci-setup.outputs.matrix }}
-      setup-script: ${{ inputs.ci-setup-script }}
-      os: ubuntu-latest
+          # Extend the JSON with the OS list
+          matrix_ci=$(echo "${matrix_fqbn}" | sed 's/}$/, '"${matrix_os}"'}/')
 
-  compile-examples-windows:
-    name: windows
-    if: contains(inputs.os-list, 'windows')
-    needs: 
-      - ci-setup
-      - package-core
-    uses : Infineon/arduino-devops/.github/workflows/compile-examples-os.yml@latest
-    with:
-      ci-matrix-json: ${{ needs.ci-setup.outputs.matrix }}
-      setup-script: ${{ inputs.ci-setup-script }}
-      os: windows-latest
+          echo "${matrix_ci}"
+          echo "matrix=${matrix_ci}" >> $GITHUB_OUTPUT
+      
+      # Steps only relevant for Arduino core
+      - name: Core setup
+        if: ${{ inputs.core-setup-script  }} != null
+        run: |
+          ${{ inputs.core-setup-script  }}
 
-  compile-examples-macos:
-    name: macos
-    if: contains(inputs.os-list, 'macos')
-    needs: 
-      - ci-setup
-      - package-core
-    uses : Infineon/arduino-devops/.github/workflows/compile-examples-os.yml@latest
-    with:
-      ci-matrix-json: ${{ needs.ci-setup.outputs.matrix }}
-      setup-script: ${{ inputs.ci-setup-script }}
-      os: macos-latest
+      - name: Package core
+        if: ${{ steps.asset_info.outputs.asset_type == 'core' }}
+        run: |
+          python ./arduino-devops/arduino-packager.py --no-previous-releases
+
+      - name: Upload core assets
+        if: ${{ steps.asset_info.outputs.asset_type == 'core' }}
+        uses: actions/upload-artifact@v4
+        with: 
+          name: arduino-core-package
+          path: |
+            build/*.zip
+            build/*.json
+
+  compile-examples:
+    needs: ci-setup
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix: ${{fromJson(needs.ci-setup.outputs.matrix)}}
+
+    steps:
+      - name: Checkout repository 
+        uses: actions/checkout@v4
+
+      - name: Checkout arduino-devops
+        uses: actions/checkout@v4
+        with:
+          repository: Infineon/arduino-devops
+          ref: latest
+          path: arduino-devops
+          
+      - name: Install python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r arduino-devops/requirements.txt
+
+      - name: Asset info
+        id: asset_info
+        shell: bash
+        run: |
+          asset_type=$(python ./arduino-devops/arduino-release.py info asset-type)
+          echo "asset_type="$asset_type"" >> $GITHUB_OUTPUT
+
+      - name: Compile setup
+        if: ${{ inputs.ci-setup-script }} != null
+        run: |
+          ${{ inputs.ci-setup-script }}
+
+      - name: Install arduino-cli
+        run: |
+          python ./arduino-devops/arduino-cli-install.py 1.2.0
+
+      - name: Retrieve core package
+        if: ${{ steps.asset_info.outputs.asset_type == 'core' }}
+        uses: actions/download-artifact@v4
+  
+      - name: Install arduino core
+        if: ${{ steps.asset_info.outputs.asset_type == 'core' }}
+        run: |
+          # The package is downloaded in the directory arduino-core-package
+          python ./arduino-devops/pckg-install-local.py --pckg-dir arduino-core-package
+        
+      - name: Install library dependencies
+        if: ${{ steps.asset_info.outputs.asset_type == 'library' }}
+        run: |
+          python ./arduino-devops/arduino-ci.py core-install --fqbn ${{ matrix.fqbn }}
+          python ./arduino-devops/arduino-ci.py lib-deps-install
+  
+      - name: Compile sketches
+        run: |
+          python ./arduino-devops/arduino-ci.py compile --fqbn ${{ matrix.fqbn }}
