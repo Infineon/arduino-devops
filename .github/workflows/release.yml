@@ -13,6 +13,13 @@ on:
         default: ''
         type: string
         description: 'Version to be used for the release. It can be a semver version or a bump type (major, minor, patch).'
+    secrets:
+      release-ssh-key:
+        required: false
+        description: 'SSH key to allow the release workflow push changes to the protected branches.'
+
+permissions:
+  contents: write
 
 jobs:
   release:
@@ -24,6 +31,7 @@ jobs:
           submodules: true
           fetch-tags: true
           fetch-depth: 0
+          ssh-key: ${{ secrets.release-ssh-key }}
 
       - name: Checkout arduino-devops
         uses: actions/checkout@v4
@@ -74,8 +82,6 @@ jobs:
       - name: Build release changelog
         id: build_changelog
         uses: mikepenz/release-changelog-builder-action@v5
-        with:
-          mode: "HYBRID"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
