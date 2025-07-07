@@ -6,7 +6,7 @@
 
 # 1. List of sketches for XMC1100_Boot_Kit
 
-$ python ../arduino-ci.py config --list sketch --filter fqbn=Infineon:xmc:XMC1100_Boot_Kit -r ./../.. --yaml
+$ python ../arduino-ci.py config --list sketch --filter fqbn=infineon:xmc:XMC1100_Boot_Kit -r ./../.. --yaml
 sketch:
 - libraries/DeviceControlXMC/examples/DieTemperatureMeasurement/DieTemperatureMeasurement.ino
 - libraries/DeviceControlXMC/examples/HeapMemoryMeasurement/HeapMemoryMeasurement.ino
@@ -22,7 +22,7 @@ sketch:
 
 # 2. List of sketches for XMC1100_XMC2GO
 
-$ python ../arduino-ci.py config --list sketch --filter fqbn=Infineon:xmc:XMC1100_XMC2GO -r ./../.. --yaml
+$ python ../arduino-ci.py config --list sketch --filter fqbn=infineon:xmc:XMC1100_XMC2GO -r ./../.. --yaml
 sketch:
 - libraries/DeviceControlXMC/examples/DieTemperatureMeasurement/DieTemperatureMeasurement.ino
 - libraries/DeviceControlXMC/examples/HeapMemoryMeasurement/HeapMemoryMeasurement.ino
@@ -38,7 +38,7 @@ sketch:
 
 # 3. List of sketches for XMC1300_Boot_Kit
 
-$ python ../arduino-ci.py config --list sketch --filter fqbn=Infineon:xmc:XMC1300_Boot_Kit -r ./../.. --yaml
+$ python ../arduino-ci.py config --list sketch --filter fqbn=infineon:xmc:XMC1300_Boot_Kit -r ./../.. --yaml
 sketch:
 - libraries/DeviceControlXMC/examples/DieTemperatureMeasurement/DieTemperatureMeasurement.ino
 - libraries/DeviceControlXMC/examples/HeapMemoryMeasurement/HeapMemoryMeasurement.ino
@@ -53,7 +53,7 @@ sketch:
 
 # 4. List of sketches for XMC1400_Arduino_Kit
 
-$ python ../arduino-ci.py config --list sketch --filter fqbn=Infineon:xmc:XMC1400_Arduino_Kit -r ./../.. --yaml
+$ python ../arduino-ci.py config --list sketch --filter fqbn=infineon:xmc:XMC1400_Arduino_Kit -r ./../.. --yaml
 sketch:
 - libraries/DeviceControlXMC/examples/DieTemperatureMeasurement/DieTemperatureMeasurement.ino
 - libraries/DeviceControlXMC/examples/HeapMemoryMeasurement/HeapMemoryMeasurement.ino
@@ -67,7 +67,7 @@ sketch:
 
 # 5. List of sketches for XMC1400_XMC2GO
 
-$ python ../arduino-ci.py config --list sketch --filter fqbn=Infineon:xmc:XMC1400_XMC2GO -r ./../.. --yaml
+$ python ../arduino-ci.py config --list sketch --filter fqbn=infineon:xmc:XMC1400_XMC2GO -r ./../.. --yaml
 sketch:
 - libraries/CAN
 - libraries/DeviceControlXMC/examples/DieTemperatureMeasurement/DieTemperatureMeasurement.ino
@@ -83,7 +83,7 @@ sketch:
 
 # 6. List of sketches for XMC4200_Platform2GO
 
-$ python ../arduino-ci.py config --list sketch --filter fqbn=Infineon:xmc:XMC4200_Platform2GO -r ./../.. --yaml
+$ python ../arduino-ci.py config --list sketch --filter fqbn=infineon:xmc:XMC4200_Platform2GO -r ./../.. --yaml
 sketch:
 - libraries/CAN
 - libraries/DeviceControlXMC/examples/StackMemoryMeasurement/StackMemoryMeasurement.ino
@@ -97,7 +97,7 @@ sketch:
 
 # 7. List of sketches for XMC4400_Platform2GO
 
-$ python ../arduino-ci.py config --list sketch --filter fqbn=Infineon:xmc:XMC4400_Platform2GO -r ./../.. --yaml
+$ python ../arduino-ci.py config --list sketch --filter fqbn=infineon:xmc:XMC4400_Platform2GO -r ./../.. --yaml
 sketch:
 - libraries/CAN
 - libraries/DeviceControlXMC/examples/StackMemoryMeasurement/StackMemoryMeasurement.ino
@@ -110,7 +110,7 @@ sketch:
 
 # 8. List of sketches for XMC4700_Relax_Kit
 
-$ python ../arduino-ci.py config --list sketch --filter fqbn=Infineon:xmc:XMC4700_Relax_Kit -r ./../.. --yaml
+$ python ../arduino-ci.py config --list sketch --filter fqbn=infineon:xmc:XMC4700_Relax_Kit -r ./../.. --yaml
 sketch:
 - libraries/CAN
 - libraries/DeviceControlXMC/examples/DieTemperatureMeasurement/DieTemperatureMeasurement.ino
