@@ -108,9 +108,9 @@ sketch:
 
 >=
 
-# 8. List of sketches for KIT_XMC47_RELAX_5V_AD_V1
+# 8. List of sketches for KIT_XMC47_RELAX
 
-$ python ../arduino-ci.py config --list sketch --filter fqbn=infineon:xmc:KIT_XMC47_RELAX_5V_AD_V1 -r ./../.. --yaml
+$ python ../arduino-ci.py config --list sketch --filter fqbn=infineon:xmc:KIT_XMC47_RELAX -r ./../.. --yaml
 sketch:
 - libraries/CAN
 - libraries/DeviceControlXMC/examples/DieTemperatureMeasurement/DieTemperatureMeasurement.ino
