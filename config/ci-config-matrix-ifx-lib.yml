@@ -10,7 +10,7 @@ fqbn:
   - infineon:xmc:kit_xmc13_boot_001
   - infineon:xmc:kit_xmc14_2go
   - infineon:xmc:kit_xmc1400_arduino
-  - infineon:xmc:kit_xmc47_relax_5v_ad_v1
+  - infineon:xmc:kit_xmc47_relax
   - infineon:psoc6:cy8ckit_062s2_ai
 
 additional_urls:
