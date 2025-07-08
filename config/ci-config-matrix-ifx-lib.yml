@@ -5,12 +5,12 @@ fqbn:
   - arduino:renesas_uno:minima
   - arduino:renesas_uno:unor4wifi
   - arduino:samd:mkrzero
-  - infineon:xmc:XMC1100_XMC2GO
-  - infineon:xmc:XMC1300_Boot_Kit
-  - infineon:xmc:XMC1400_XMC2GO
-  - infineon:xmc:XMC1400_Arduino_Kit
-  - infineon:xmc:XMC4700_Relax_Kit
-  - infineon:xmc:XMC1100_Boot_Kit
+  - infineon:xmc:kit_xmc_2go_xmc1100_v1
+  - infineon:xmc:kit_xmc11_boot_001
+  - infineon:xmc:kit_xmc13_boot_001
+  - infineon:xmc:kit_xmc14_2go
+  - infineon:xmc:kit_xmc1400_arduino
+  - infineon:xmc:kit_xmc47_relax_5v_ad_v1
   - infineon:psoc6:cy8ckit_062s2_ai
 
 additional_urls:
