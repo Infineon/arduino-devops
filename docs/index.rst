@@ -27,7 +27,17 @@ We hope you find in these pages **all the required information** to use Arduino 
    release/index
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Scripts
    
-   scripts/scripts
+   scripts/arduino-ci
+   scripts/arduino-packager
+   scripts/pckg-install-local
+   scripts/arduino-release
+   scripts/arduino-cli-install
+
+
+.. warning::
+    
+    These scripts will be unified in upcoming iteration in a single tools, and refactored
+    for clarity of usage.

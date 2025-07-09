@@ -1,20 +1,8 @@
 Compile examples
 ================
 
-Description
-------------
+.. toctree::
+   :maxdepth: 2
 
-.. _compile_examples_getting_started:
-
-Getting started
-----------------
-
-Usage
------
-
-The compile matrix
-------------------
-
-Dependency installation
------------------------
-
+   description
+   getting-started
