@@ -17,7 +17,7 @@ specifications to auto-discover the available boards and examples available in t
 
 The default auto-discovery matrix can be customized to consider exceptions via configuration YAML files.
 
-It also supports the installation of the tools and source dependencies for multiple operating systems required to compile the sketches for the selected boards.
+It also supports the installation of the tools and source dependencies for multiple operating systems, which are necessary for compiling the sketches for the selected boards.
 
 Implementation details
 ^^^^^^^^^^^^^^^^^^^^^^

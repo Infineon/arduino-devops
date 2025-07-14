@@ -23,8 +23,9 @@ Otherwise, you can specify the file by using the flag ``-c``, ``--ci-matrix-yml`
 
     python arduino-devops/arduino-ci.py <command> -c path/to/ci-matrix-config.yml
 
-When calling the tool, it will consider the current path the root path of the Arduino asset.
-Otherwise, you will need to specify the root path of the asset by using the flag ``-r``, ``--root-path`` followed by the path to the root of the asset:
+The script needs to know the root path of the asset to be able to discover the boards and examples.
+Unless specified, the root path will be the current working directory from which the script is executed.
+Otherwise, you will need to specify the root path of the asset by using the flag ``-r``, ``--root-path`` followed by the path to the asset's root directory:
 
 .. code:: bash
 
@@ -42,7 +43,7 @@ config
 Shows and queries the ci configuration matrix. This command is helpful within CI/CD workflows in the creation of parallel jobs 
 for the compilation of the sketches and boards matrix.
 
-It support the following output formats:
+It supports the following output formats:
 
  - JSON (``--json`` or ``--json-pretty``)
  - YAML (``--yaml``) . 
@@ -113,7 +114,7 @@ Or we can compile all the relevant sketches for a given board by using the ``--f
 core-install
 ------------
 
-In case of Arduino libraries, before being able to compile the matrix, you will need to have the package cores of each of the matrix boards installed.
+To compile the matrix for Arduino libraries, you must first install the package cores for each board in the matrix.
 
 The following command will take care of the installation of all the required package cores:
 
@@ -215,7 +216,7 @@ The yaml file uses the following keys:
                 and these particular values are "not discoverable".
 
         The allowed keys are ``fqbn`` and ``sketch``. 
-        The value formats allowed are the same as the root node keys. 
+        The value formats allowed are the same as the root `node <https://yaml.org/spec/1.2.2/#nodes>`_ keys (``fqbn`` and ``sketch`` as primary keys in the YAML file). 
         But in this case, the value can be a list (of scalars) or a scalar.
 
         Example:
@@ -246,12 +247,12 @@ The yaml file uses the following keys:
 
         - Single keys: 
             A dictionary with either ``fqbn`` or ``sketch`` key. The
-            values will them be then (if present) removed from the default matrix key. 
+            values will be (if present) removed from the default matrix key. 
             This is mainly useful when the main matrix is automatically discovered, 
-            and a one particular value is not (momentarily?) compatible for some reason.
+            and a particular value is not compatible for some reason.
 
         The allowed keys are ``fqbn`` and ``sketch``. 
-        The value formats allowed are the same as the root node keys. 
+        The value formats allowed are the same as the root `node <https://yaml.org/spec/1.2.2/#nodes>`_ keys (``fqbn`` and ``sketch`` as primary keys in the YAML file). 
         But in this case, the value can be a list (of scalars) or a scalar.
 
         Example:
