@@ -3,7 +3,7 @@
 Getting started
 ----------------
 
-This section will guide your through the steps to setup the compile examples workflow in your repository.
+This section will guide you through the steps to setup the compile examples workflow in your repository.
 
 Prerequisites
 ^^^^^^^^^^^^^^
@@ -11,8 +11,8 @@ Prerequisites
 Before you start, make sure you satisfy the following prerequisites:
 
 - Your Arduino asset (library or core) is hosted in a GitHub repository.
-- GitHub Actions enabled in your repository. Check the `GitHub docs <https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#managing-github-actions-permissions-for-your-repository>`_ to learn how to enable it.
-- If your asset is an Arduino core, first you need to `configure the repository <df>`_ to be able generate the core package with the ``core-packager.py`` tool. 
+- GitHub Actions is enabled in your repository. Check the `GitHub docs <https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#managing-github-actions-permissions-for-your-repository>`_ to learn how to enable it.
+- If your asset is an Arduino core, first you need to `configure the repository <df>`_ to be able to generate the core package with the ``core-packager.py`` tool. 
 
 Enabling the reusable workflow
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -51,7 +51,7 @@ Now, you can go to the ``Actions`` tab of your repository in GitHub and see the 
 
 If your asset is an **Arduino core**, the workflow will compile all the available examples from the built-in libraries against each of the boards in the `board.txt <https://docs.arduino.cc/arduino-cli/platform-specification/#boardstxt>`_ file.
 
-In the case of **Arduino libraries**, the workflow will to compile all the examples available in the ``examples`` directory for the default set of boards defined
+In the case of **Arduino libraries**, the workflow will compile all the examples available in the ``examples`` directory for the default set of boards defined
 in the file: `config/ci-config-matrix-ifx-lib.yml <https://github.com/Infineon/arduino-devops/blob/main/config/ci-config-matrix-ifx-lib.yml>`_.
 
 
