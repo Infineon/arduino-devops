@@ -1,16 +1,11 @@
 Release
-=======
+-------
 
-Description
------------
+This section contains documentation for the release workflow and related scripts.
 
-.. _release_getting_started:
+.. toctree::
+   :maxdepth: 2
 
-Getting started
-----------------
-
-Usage
------
-
-Asset creation
---------------
+   description
+   getting-started
+  
