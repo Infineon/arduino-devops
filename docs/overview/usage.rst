@@ -5,7 +5,7 @@ This repository is designed to automate DevOps processes for Arduino libraries a
 Thus, we recommend starting by adding the available `reusable workflows <https://github.com/Infineon/arduino-devops/tree/main/.github/workflows>`_ to your GitHub-hosted library or core.
 Before running the workflows, you'll need to configure them with some minimal settings.
 
-Step-by-Step Enablement
+Step-by-step enablement
 -----------------------
 
 To begin, we recommend following our Getting Started guides, which will walk you through the process of enabling the workflows:
@@ -13,12 +13,12 @@ To begin, we recommend following our Getting Started guides, which will walk you
 - :ref:`Getting started with compile-examples <compile_examples_getting_started>` workflow enablement. Learn how to set up the compile-examples workflow and start automating your build processes.
 - :ref:`Getting started with release <release_getting_started>` workflow enablement. Discover how to enable the release workflow and streamline your library or core releases.
 
-Advanced Customizations and Local Usage
+Advanced customizations and local usage
 ---------------------------------------
 
 As you become more familiar with the workflows and scripts, you might need advanced customizations to tailor them to your needs. You can also use the scripts locally on your development machine.
 
-Running Scripts Locally
+Running scripts locally
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 To run the scripts locally, first ensure you have the required dependencies installed (see :ref:`Requirements <requirements>`).
