@@ -12,7 +12,7 @@ Before you start, make sure you satisfy the following prerequisites:
 
 - Your Arduino asset (library or core) is hosted in a GitHub repository.
 - GitHub Actions is enabled in your repository. Check the `GitHub docs <https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#managing-github-actions-permissions-for-your-repository>`_ to learn how to enable it.
-- If your asset is an Arduino core, first you need to `configure the repository <df>`_ to be able to generate the core package with the ``core-packager.py`` tool. 
+- If your asset is an Arduino core, first you need to :doc:`configure the repository <../scripts/arduino-packager>` to be able to generate the core package with the ``core-packager.py`` tool. 
 
 Enabling the reusable workflow
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
