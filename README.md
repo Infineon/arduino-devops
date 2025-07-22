@@ -27,12 +27,12 @@ Please, [let us know](https://github.com/Infineon/arduino-devops/issues) if you 
 
 You can get started by enabling the following workflows for your Arduino assets:
 
-* [Enable *compile-examples* build check for Arduino assets](tutorial)
-* [Enable *release* management for Arduino assets](tutorial-release)
+* [Enable *compile-examples* build check for Arduino assets](https://ifx-arduino-devops.readthedocs.io/en/latest/compile-examples/getting-started.html)
+* [Enable *release* management for Arduino assets](https://ifx-arduino-devops.readthedocs.io/en/latest/release/getting-started.html)
 
 ## More information
 
-Find the complete information in the repo [docs](docs/).
+Find the complete information in the repo [docs](https://ifx-arduino-devops.readthedocs.io/en/latest).
 
 ## Contributing
 
