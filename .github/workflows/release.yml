@@ -13,6 +13,11 @@ on:
         default: ''
         type: string
         description: 'Version to be used for the release. It can be a semver version or a bump type (major, minor, patch).'
+      called-ref:
+        required: false
+        type: string
+        default: 'latest'
+        description: 'The ref to use for reusable workflow. The same version of the repository tool will be used if specified.'
     secrets:
       release-ssh-key:
         required: false
@@ -37,7 +42,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Infineon/arduino-devops
-          ref: latest
+          ref: ${{ inputs.called-ref }}
           path: arduino-devops
 
       - name: Install python dependencies
