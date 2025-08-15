@@ -22,6 +22,11 @@ on:
         description: | 
           'The operating system to use for the CI jobs. Default is "ubuntu-latest" for libraries
           and "ubuntu-latest", "windows-latest", and "macos-latest" for cores.'
+      called-ref:
+        required: false
+        type: string
+        default: 'latest'
+        description: 'The ref to use for reusable workflow. The same version of the repository tool will be used if specified.'
 
 jobs:  
   ci-setup:
@@ -41,7 +46,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Infineon/arduino-devops
-          ref: latest
+          ref: ${{ inputs.called-ref }}
           path: arduino-devops
 
       - name: Install python dependencies
@@ -111,7 +116,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Infineon/arduino-devops
-          ref: latest
+          ref: ${{ inputs.called-ref }}
           path: arduino-devops
           
       - name: Install python dependencies
