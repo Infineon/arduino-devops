@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import sys
 import subprocess
 import yaml
@@ -837,7 +838,7 @@ class CiCoreInstaller():
         """
         self.ci_config = ci_config
 
-    def install(self, fqbn=None):
+    def install(self, fqbn=None, local=False):
         """
         Installs the core for the fqbn list in the matrix.
         
@@ -850,7 +851,7 @@ class CiCoreInstaller():
         for fqbn in fqbn_list:
             if not self.__is_core_installed(fqbn):
                 print(f"Installing core for fqbn \"{fqbn}\"")
-                self.__install_core(fqbn)
+                self.__install_core(fqbn, local=local)
             else:   
                 print(f"Core for fqbn \"{fqbn}\" is already installed.")
 
@@ -902,8 +903,51 @@ class CiCoreInstaller():
             return True
 
         return False
-        
-    def __install_core(self, fqbn):
+    
+    def __install_core_from_local(self, core):
+        """
+        Install the core by cloning the repository and using 
+        the arduino-devops scripts to build and install it from the local sources.
+        This prevents the downloads from the arduino board managers to be polluted 
+        by the continuous integration downloads (which are not users download).
+
+        This is only used for the Infineon cores, as they can fulfill the arduino-devops
+        scripts requirements for local installation.
+
+        Args:
+            - core (str): The core to be installed.
+        """
+        print("Using local core installation for Infineon cores.")
+        # The first part of the url until the /release/ substring will be the repository url
+        additional_url = self.ci_config.get_additional_url(core)
+        core_repo = additional_url.split("/release")[0] + ".git"
+
+        try: 
+            # Clone the repository in a separate repo
+            core_build_path = os.path.join(self.ci_config.asset_root_path, "core-build")
+            if not os.path.exists(core_build_path):
+                os.makedirs(core_build_path)
+            subprocess.run(["git", "clone", core_repo, core_build_path], capture_output=True, check=True)
+
+            os.chdir(core_build_path)
+
+            # Move to the latest tag
+            subprocess.run(["git", "fetch", "--tags"], capture_output=True, check=True)
+            latest_tag = subprocess.run(["git", "describe", "--tags", "--abbrev=0"], capture_output=True, text=True, check=True).stdout.strip()
+            subprocess.run(["git", "checkout", latest_tag], capture_output=True, check=True)
+
+            # Install the core from local
+            subprocess.run(["python", "../arduino-devops/arduino-packager.py"], capture_output=True, text=True, check=True)
+            subprocess.run(["python", "../arduino-devops/pckg-install-local.py", "--pckg-dir", "build"], capture_output=True, text=True, check=True)
+
+            # Remove the core build directory
+            os.chdir(self.ci_config.asset_root_path)
+            shutil.rmtree(core_build_path)
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Error installing core from local repository: {e}")
+            sys.exit(1)
+
+    def __install_core(self, fqbn, local=False):
         """
         Installs the core for the provided fqbn.
         It will check if the core is a third party core, and if so,
@@ -917,27 +961,33 @@ class CiCoreInstaller():
         core = self.__strip_core(fqbn)
 
         additional_install_flags = []
+        
         if self.__is_third_party_core(core):
-            additional_install_flags = ["--additional-urls", self.ci_config.get_additional_url(core)]
-            if additional_install_flags[1] is None:
-                logging.error(f"Error getting additional url for core \"{core}\"")
-                sys.exit(1)
 
-        command = [
-            "arduino-cli",
-            "core",
-            "install",
-            core
-        ]
+            if local and (core.startswith("infineon") or core.startswith("Infineon")):
+                self.__install_core_from_local(core)
+            else:
+                        
+                additional_install_flags = ["--additional-urls", self.ci_config.get_additional_url(core)]
+                if additional_install_flags[1] is None:
+                    logging.error(f"Error getting additional url for core \"{core}\"")
+                    sys.exit(1)
 
-        if additional_install_flags != []:
-            command.extend(additional_install_flags)
+                command = [
+                    "arduino-cli",
+                    "core",
+                    "install",
+                    core
+                ]
 
-        core_install_proc = subprocess.run(command, capture_output=True, text=True, check=False)
-        if core_install_proc.returncode != 0:
-            logging.error(f"Error installing core for fqbn: {fqbn}")
-            print(core_install_proc.stderr)
-        else:
+                if additional_install_flags != []:
+                    command.extend(additional_install_flags)
+
+                core_install_proc = subprocess.run(command, capture_output=True, text=True, check=False)
+                if core_install_proc.returncode != 0:
+                    logging.error(f"Error installing core for fqbn: {fqbn}")
+                    print(core_install_proc.stderr)
+                
             print(f"Core for fqbn \"{fqbn}\" installed successfully.")
 
 
@@ -1495,7 +1545,7 @@ class CiParser:
         """
         ci_config = self.__get_ci_config(args)
         ci_core_installer = CiCoreInstaller(ci_config)
-        ci_core_installer.install(args.fqbn)
+        ci_core_installer.install(args.fqbn, args.local)
 
     def __lib_deps_install_parser_func(self, args):
         """
@@ -1634,6 +1684,14 @@ class CiParser:
             type=str,
             default=None,
             help="The fqbn of the board to be installed",
+        )
+
+        # Argument for installing Infineon core from repo (instead of from releases)
+        core_install_parser.add_argument(
+            "--local",
+            action="store_true",
+            default=True,
+            help="Install the core from local repository if available. This is only for Infineon cores.",
         )
 
         # Add the lib-deps-install subparser
