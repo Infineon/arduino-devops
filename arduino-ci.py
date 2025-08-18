@@ -961,34 +961,32 @@ class CiCoreInstaller():
         core = self.__strip_core(fqbn)
 
         additional_install_flags = []
-        
-        if self.__is_third_party_core(core):
-
-            if local and (core.startswith("infineon") or core.startswith("Infineon")):
-                self.__install_core_from_local(core)
-            else:
-                        
+    
+        if local and (core.startswith("infineon") or core.startswith("Infineon")):
+            self.__install_core_from_local(core)
+        else:
+            if self.__is_third_party_core(core):
                 additional_install_flags = ["--additional-urls", self.ci_config.get_additional_url(core)]
                 if additional_install_flags[1] is None:
                     logging.error(f"Error getting additional url for core \"{core}\"")
                     sys.exit(1)
 
-                command = [
-                    "arduino-cli",
-                    "core",
-                    "install",
-                    core
-                ]
+            command = [
+                "arduino-cli",
+                "core",
+                "install",
+                core
+            ]
 
-                if additional_install_flags != []:
-                    command.extend(additional_install_flags)
+            if additional_install_flags != []:
+                command.extend(additional_install_flags)
 
-                core_install_proc = subprocess.run(command, capture_output=True, text=True, check=False)
-                if core_install_proc.returncode != 0:
-                    logging.error(f"Error installing core for fqbn: {fqbn}")
-                    print(core_install_proc.stderr)
+            core_install_proc = subprocess.run(command, capture_output=True, text=True, check=False)
+            if core_install_proc.returncode != 0:
+                logging.error(f"Error installing core for fqbn: {fqbn}")
+                print(core_install_proc.stderr)
                 
-            print(f"Core for fqbn \"{fqbn}\" installed successfully.")
+        print(f"Core for fqbn \"{fqbn}\" installed successfully.")
 
 
     @staticmethod
