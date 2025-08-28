@@ -35,6 +35,7 @@ We hope you find in these pages **all the required information** to use Arduino 
    scripts/pckg-install-local
    scripts/arduino-release
    scripts/arduino-cli-install
+   scripts/arduino-extlib
 
 
 .. warning::
