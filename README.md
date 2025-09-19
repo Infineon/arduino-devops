@@ -1,5 +1,7 @@
 # Arduino DevOps
 
+[![Check links](https://github.com/Infineon/arduino-devops/actions/workflows/check_links.yml/badge.svg)](https://github.com/Infineon/arduino-devops/actions/workflows/check_links.yml)
+
 This repository contains a **collection of utilities** designed to ease and support the **DevOps** of **Arduino third-party cores** and **libraries**.
 
 ## Audience
@@ -54,4 +56,4 @@ Thanks a lot for your contribution! 🙏
 
 ## License
 
-See the [LICENSE](LICENSE.md) file for more details.
+See the [LICENSE](/LICENSE) file for more details.
