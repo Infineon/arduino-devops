@@ -100,48 +100,31 @@ class ExtLib:
                 continue
             
             # Check if the source git tag and hash match the .extlib.yml file values
-            if repo.get("tag") != self.__get_git_tag(repo) or repo.get("head") != self.__get_git_hash(repo):
-                logging.error(f"The submodule \"{repo.get('repo')}\" version and the copied extlib head do not match.")
-                sys.exit(1)
+            if repo.get("tag") != self.__get_git_tag(repo):
+              logging.error(f"The submodule \"{repo.get('repo')}\" tag and extlib metafile version does not match.")
+              logging.error(f"Submodule tag: {self.__get_git_tag(repo)}")
+              logging.error(f"extlib.yml tag: {repo.get('tag')}") 
+              sys.exit(1)
 
-            has_differences = False
-            file_list = repo.get("files", [])
-            if isinstance(file_list, dict):
-                file_list = [file_list]
+            if repo.get("head") != self.__get_git_hash(repo):
+               logging.error(f"The submodule \"{repo.get('repo')}\" head and extlib metafile head does not match.")
+               logging.error(f"Submodule head: {self.__get_git_hash(repo)}")
+               logging.error(f"extlib.yml head: {repo.get('head')}")
+               sys.exit(1)
+
+            # Even if the metafile and the submodule match 
+            # we check if actually the copied files match the submodule files
+            files = repo.get("files", [])
+            if isinstance(repo.get("files", []), dict):
+                    files = [repo["files"]]
             
-            for file_config in file_list:
-                src_list = file_config.get("src", [])
-                if isinstance(src_list, str):
-                    src_list = [src_list]
-                
-                for src in src_list:
-                    src_path = os.path.join(self.asset_root_path, repo.get("repo"), src)
-                    dest_path = os.path.join(self.asset_root_path, file_config.get("dest"))
-                    # Quick binary check
-                    if os.path.isfile(src_path):
-                        dest_path = os.path.join(dest_path, src)
-                        if os.path.isfile(dest_path):
-                            if not filecmp.cmp(src_path, dest_path):
-                                has_differences = True
-                                break
-                    elif os.path.isdir(src_path) and os.path.isdir(dest_path):
-                        dcmp = filecmp.dircmp(src_path, dest_path)
-                        if dcmp.diff_files or dcmp.left_only or dcmp.right_only:
-                            has_differences = True
-                            break
-                    else:
-                        has_differences = True  # Path mismatch
-                        break
-                
-                if has_differences:
-                    break
-            
-            # Simple binary output
-            if has_differences:
-                logging.error(f"Submodule and copied files DO NOT match extlib match. Copied files have been directly modified in destination!!")
-                sys.exit(1)
-            else:
-                logging.info(f"Submodule and copied files and version metadata extlib match.")
+            for file in files:
+                src_path = os.path.join(self.asset_root_path, repo.get("repo"), file.get("src", []))
+                dest_path = os.path.join(self.asset_root_path, file.get("dest", []))
+                git_diff_result = self.__get_git_diff(src_path, dest_path)
+                if  git_diff_result != "":
+                    logging.error(git_diff_result)
+                    sys.exit(1)
 
     def __parse_config(self):
         """
@@ -358,6 +341,29 @@ class ExtLib:
             return f"{hash_result}-dirty"
         else:
             return hash_result
+        
+    def __get_git_diff(self, src_path, dest_path):
+        """
+        Gets git diff of the submodule between src_path and dest_path
+
+        Args:
+            submodule (dict): Submodule configuration dictionary.
+            src_path (str): Source path to compare.
+            dest_path (str): Destination path to compare.
+
+        Returns:
+            str: Git diff output.
+        """  
+        command = ["git", "-C", self.asset_root_path, "diff", "--no-index", src_path, dest_path]
+        git_diff = subprocess.run(command, capture_output=True, text=True, check=False)
+        git_diff_result = git_diff.stdout.strip()
+
+        # An error unrelated to identical or different
+        if git_diff.returncode not in [0, 1]: 
+            logging.error(f"Git diff command failed with error: {git_diff.stderr.strip()}")
+            return None
+
+        return git_diff_result
 
     def __udpate_config_yml(self, submodule, mode):
         """
