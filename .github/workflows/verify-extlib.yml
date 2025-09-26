@@ -1,0 +1,46 @@
+name: Verify extlib
+
+on:
+  workflow_call:
+    inputs:
+      called-ref:
+        required: false
+        type: string
+        default: 'latest'
+        description: 'The ref to use for reusable workflow. The same version of the repository tool will be used if specified.'
+
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        
+          submodules: 'recursive'
+          fetch-tags: true     
+      
+      # Checkout actions does not fetch submodule tags, 
+      # so we need to do it manually
+      - name: Init & update submodules (full history + tags)
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --recursive
+          git submodule foreach --recursive 'git fetch --tags --force || true'
+ 
+      - name: Checkout arduino-devops
+        uses: actions/checkout@v4
+        with:
+          repository: Infineon/arduino-devops
+          ref: ${{ inputs.called-ref }}
+          path: arduino-devops
+
+      - name: Install python dependencies
+        run: |
+            python -m pip install --upgrade pip
+            pip install -r arduino-devops/requirements.txt
+
+      - name: Verify extlib
+        run: |
+          python ./arduino-devops/arduino-extlib.py verify
