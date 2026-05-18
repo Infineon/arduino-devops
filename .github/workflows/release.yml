@@ -75,7 +75,7 @@ jobs:
           echo "asset_type="$asset_type"" >> $GITHUB_OUTPUT
       
       - name: Release setup
-        if : ${{ inputs.setup-script }} != null
+        if: ${{ inputs.setup-script != '' }}
         run: |
           ${{ inputs.setup-script }}
   
