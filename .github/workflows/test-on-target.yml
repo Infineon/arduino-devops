@@ -175,6 +175,12 @@ jobs:
         run: |
           ${{ inputs.ci-setup-script }}
 
+      - name: Install ottu
+        run: |
+          # The runner of this job can differ from the setup one, and user-level installs are per runner
+          python -m pip install --user --upgrade ottu
+          python -m pip show ottu
+
       - name: Add user-level pip scripts to PATH
         run: |
           echo "$HOME/.local/bin" >> $GITHUB_PATH
